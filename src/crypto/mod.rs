@@ -1,1 +1,1 @@
-mod gen_key_pair;
+pub mod gen_key_pair;

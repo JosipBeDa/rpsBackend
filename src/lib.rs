@@ -1,20 +1,12 @@
-pub mod schema;
-pub mod models;
-
 #[macro_use]
 extern crate diesel;
+extern crate bcrypt;
 extern crate dotenv;
+extern crate jsonwebtoken;
 
-pub struct AuthForm {
-    pub username: String,
-    pub password: String
-}
+pub mod crypto;
+pub mod models;
+pub mod schema;
+pub mod services;
 
-pub struct AuthResponse {
-    ok: bool,
 
-}
-
-pub enum CustomError {
-    DieselError(diesel::result::Error)
-}

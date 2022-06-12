@@ -1,10 +1,11 @@
 use actix_cors::Cors;
-use actix_web::{http, web};
+use actix_web::{http, web,};
+use crate::routes;
 
 /// Returns the routing config
 pub fn setup_routes(cfg: &mut web::ServiceConfig) {
     // GET /
-    //cfg.service(web::resource("/").route(web::get().to(routes::hello_world)));
+    cfg.service(web::resource("/register").route(web::post().to(routes::auth::register::handler)));
 }
 
 /// Return cors configuration for the project

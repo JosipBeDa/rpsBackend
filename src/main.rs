@@ -1,8 +1,16 @@
+#[macro_use]
+extern crate diesel;
+extern crate bcrypt;
+extern crate dotenv;
+extern crate jsonwebtoken;
+
 pub mod application;
 pub mod state;
 pub mod routes;
-
-extern crate rps_backend;
+pub mod models;
+pub mod schema;
+pub mod crypto;
+pub mod services;
 
 use actix_web::middleware::Logger;
 use actix_web::{web::Data, App, HttpServer};
@@ -22,8 +30,8 @@ async fn main() -> std::io::Result<()> {
                 "%a %t '%r' %s %b '%{Referer}i' '%{User-Agent}i' %T",
             ))
             .app_data(app_state.clone())
-            .wrap(application::setup_cors())
             .configure(application::setup_routes)
+            .wrap(application::setup_cors())
     })
     .bind(("127.0.0.1", 8080))?
     .run()
