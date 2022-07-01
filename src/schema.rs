@@ -2,7 +2,8 @@ table! {
     messages (id) {
         id -> Int4,
         sender_id -> Varchar,
-        room_id -> Nullable<Varchar>,
+        rec_user -> Nullable<Varchar>,
+        rec_room -> Nullable<Varchar>,
         body -> Nullable<Varchar>,
         time_sent -> Nullable<Timestamptz>,
     }
@@ -13,6 +14,7 @@ table! {
         id -> Varchar,
         name -> Varchar,
         password -> Nullable<Varchar>,
+        admin -> Nullable<Varchar>,
     }
 }
 
@@ -33,8 +35,8 @@ table! {
     }
 }
 
-joinable!(messages -> rooms (room_id));
-joinable!(messages -> users (sender_id));
+joinable!(messages -> rooms (rec_room));
+joinable!(rooms -> users (admin));
 joinable!(user_room_junction -> rooms (room_id));
 joinable!(user_room_junction -> users (user_id));
 

@@ -43,13 +43,9 @@ pub fn generate_rsa_key_pair() -> Result<(), WriteError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::authentication::Claims;
+    use crate::services::jwt::Claims;
     use jsonwebtoken::*;
 
-    #[test]
-    fn encrypt_decrypt() {
-        unimplemented!();
-    }
     #[test]
     fn encode_decode_jwt() {
         //Fetch the private key
@@ -62,7 +58,6 @@ mod tests {
         //Transmogrify the key key par to the encoding and decoding keys as arrays of u8
         let encoding_key = jsonwebtoken::EncodingKey::from_rsa_pem(&priv_key)
             .expect("Couldn't parse encoding key");
-
         let decoding_key =
             jsonwebtoken::DecodingKey::from_rsa_pem(&pub_key).expect("Couldn't parse decoding key");
 
@@ -86,7 +81,7 @@ mod tests {
         assert_eq!(claims, decoded.claims);
         assert_eq!(expires, decoded.claims.exp);
         assert_eq!(now, decoded.claims.iat);
-        assert_eq!(Algorithm::RS256, decoded.header);
+        assert_eq!(Algorithm::RS256, decoded.header.alg);
         //assert_eq!(claims.sub, decoded.claims.sub)
     }
 }

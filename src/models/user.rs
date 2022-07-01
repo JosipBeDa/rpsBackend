@@ -6,6 +6,7 @@ use uuid::Uuid;
 pub struct User {
     pub id: String,
     pub username: String,
+    #[serde(skip_serializing)]
     pub password: String,
 }
 pub use crate::schema::users;
@@ -28,6 +29,21 @@ impl User {
             .load::<User>(conn)
         {
             Ok(mut result) => Ok(result.pop()),
+            Err(e) => Err(e),
+        }
+    }
+    pub fn find_by_id(
+        conn: &PgConnection,
+        id: &str,
+    ) -> Result<Option<User>, diesel::result::Error> {
+        match users::table.filter(users::id.eq(id)).load::<User>(conn) {
+            Ok(mut result) => Ok(result.pop()),
+            Err(e) => Err(e),
+        }
+    }
+    pub fn find_all(conn: &PgConnection, limit: i64) -> Result<Vec<User>, diesel::result::Error> {
+        match users::table.limit(limit).load(conn) {
+            Ok(result) => Ok(result),
             Err(e) => Err(e),
         }
     }

@@ -2,3 +2,4 @@
 .env
 Cargo.lock
 /key_pair
+server_config.toml
