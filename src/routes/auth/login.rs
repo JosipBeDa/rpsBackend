@@ -1,12 +1,11 @@
 use crate::models::authentication::{AuthForm, AuthResponse};
-use crate::models::user::User;
+use crate::models::user::{User};
 use crate::services::cookie::*;
 use crate::services::jwt;
 use crate::state::app::AppState;
 use actix_session::Session;
 use actix_web::{web, HttpResponseBuilder as Response, Responder};
 use reqwest::StatusCode;
-
 
 pub async fn handler(
     auth_form: web::Form<AuthForm>,
@@ -27,11 +26,12 @@ pub async fn handler(
                     return Response::new(StatusCode::UNAUTHORIZED)
                         .json(AuthResponse::fail("Invalid Credentials"));
                 }
+                let user = user.convert();
                 // Generate token and session ID
-                if let Ok((token, _exp_in)) = jwt::generate_jwt(&user.id) {
-                    session.insert("user_id", &user.id).unwrap();
-                    session.insert("username", &user.username).unwrap();
-                    let cookie = create_cookie(&token, CookieType::Authorization);
+                if let Ok((token, exp_in)) = jwt::generate_jwt(user.to_string()) {
+                    //session.insert("user_id", &user.id).unwrap();
+                    //session.insert("username", &user.username).unwrap();
+                    let cookie = create_cookie(&token, exp_in, CookieType::Authorization);
                     Response::new(StatusCode::OK)
                         .cookie(cookie)
                         .json(AuthResponse::succeed(user, "Success!"))

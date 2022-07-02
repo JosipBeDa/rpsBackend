@@ -1,6 +1,7 @@
-use crate::models::user::User;
 use crate::services::cookie::generate_session_id;
 use serde::{Deserialize, Serialize};
+
+use super::user::ChatUser;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct AuthForm {
@@ -13,7 +14,7 @@ pub struct AuthResponse {
     session_id: Option<String>,
     ok: bool,
     message: &'static str,
-    user: Option<User>,
+    user: Option<ChatUser>,
 }
 #[derive(Debug)]
 pub enum AuthenticationError {
@@ -38,7 +39,7 @@ impl std::fmt::Display for AuthenticationError {
 }
 
 impl AuthResponse {
-    pub fn succeed(user: User, message: &'static str) -> Self {
+    pub fn succeed(user: ChatUser, message: &'static str) -> Self {
         Self {
             session_id: Some(generate_session_id()),
             ok: true,

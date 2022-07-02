@@ -14,6 +14,8 @@ use std::{
     },
     //  time::{Instant, Duration}
 };
+use crate::chat::ez_handler;
+use crate::models::user::ChatUser;
 
 /// `ChatServer` manages chat rooms and responsible for coordinating chat session.
 #[derive(Debug)]
@@ -36,11 +38,11 @@ impl ChatServer {
 
 impl ChatServer {
     /// Send message to all users in the room
-    fn send_message(&self, receiver: &str, message: &str) {
+    fn send_message(&self, receiver: &str, message: ClientMessage) {
         if let Some(sessions) = self.rooms.get(receiver) {
             for id in sessions {
                 if let Some(addr) = self.sessions.get(id) {
-                    let _ = addr.do_send(Message(message.to_owned()));
+                    let _ = addr.do_send(Message(message.to_string()));
                 }
             }
         }
@@ -67,7 +69,7 @@ impl Actor for ChatServer {
 /// Register a new session and assign unique id to this session
 impl Handler<Connect> for ChatServer {
     type Result = ();
-    fn handle(&mut self, msg: Connect, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, _: Connect, _: &mut Context<Self>) -> Self::Result {
         self.visitor_count.fetch_add(1, Ordering::SeqCst);
     }
 }
@@ -124,10 +126,10 @@ impl Handler<Users> for ChatServer {
 }
 
 /// Handler for Message message.
-impl<T> Handler<ClientMessage<T>> for ChatServer {
-    type Result = MessageResult<ClientMessage<T>>;
+impl Handler<ClientMessage> for ChatServer {
+    type Result = MessageResult<ClientMessage>;
 
-    fn handle(&mut self, msg: ClientMessage<T>, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: ClientMessage, _: &mut Context<Self>) -> Self::Result {
         if let Some(ref body) = msg.body {
             let chat_message: ChatMessage = match serde_json::from_str(&body) {
                 Ok(msg) => msg,
@@ -143,12 +145,11 @@ impl<T> Handler<ClientMessage<T>> for ChatServer {
                 }
             };
             //println!("MSG: {:?}", &msg);
-            println!("ROOMS: {:?}", self.rooms);
-            println!("SESSIONS: {:?}", self.sessions);
+
             if let Some(rooms) = self.rooms.get(&msg.session_id) {
                 if let Some(receiver) = rooms.get(&chat_message.receiver_id) {
                     println!("SENDING MSG TO: {:?}", self.sessions.get(receiver));
-                    self.send_message(receiver, &body);
+                    //self.send_message(receiver, &body);
                 }
             }
         }
@@ -189,7 +190,7 @@ impl Handler<Join> for ChatServer {
         }
         // send message to other users
         for room in rooms {
-            self.send_message(&room, "Someone disconnected");
+           // self.send_message(&room, "Someone disconnected");
         }
 
         self.rooms
@@ -197,6 +198,6 @@ impl Handler<Join> for ChatServer {
             .or_insert_with(HashSet::new)
             .insert(id.clone());
 
-        self.send_message(&name, "Someone connected");
+       // self.send_message(&name, "Someone connected");
     }
 }

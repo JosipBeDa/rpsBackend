@@ -43,7 +43,7 @@ pub fn generate_rsa_key_pair() -> Result<(), WriteError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::jwt::Claims;
+    use crate::{services::jwt::Claims, models::user::ChatUser};
     use jsonwebtoken::*;
 
     #[test]
@@ -66,12 +66,13 @@ mod tests {
         //Expires in 5 minutes
         let expires = now + 60 * 5;
         //Generate the claims
-        let claims = Claims::new("Hello wordl".to_string(), now, expires);
-
+        let user = ChatUser {id: String::from("lol"), username: String::from("lawl"), connected: false};
+        let claims = Claims::new(user.to_string(), now, expires);
+        eprintln!("{claims:?}");
         //Encode jwt
         let token = encode(&jsonwebtoken::Header::new(Algorithm::RS256), &claims, &encoding_key)
             .expect("Couldn't encode token");
-
+        eprintln!("token: {}", token);
         //Set headers for decoding
         let validation = Validation::new(Algorithm::RS256);
 

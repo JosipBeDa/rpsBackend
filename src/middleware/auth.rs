@@ -1,5 +1,6 @@
 use crate::models::{authentication::AuthenticationError, custom_error::CustomError};
 use crate::services::jwt;
+use crate::models::user::ChatUser;
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
 use futures_util::future::LocalBoxFuture;
 use std::future::{ready, Ready};
@@ -43,9 +44,9 @@ where
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         match is_authorized(&req) {
-            Ok(user_id) => {
+            Ok(chat_user) => {
                 let fut = self.service.call(req);
-                println!("user_id: {}", user_id);
+                println!("chat_user: {:?}", chat_user);
                 Box::pin(async move {
                     let res = fut.await?;
                     Ok(res)
@@ -62,7 +63,7 @@ where
     }
 }
 
-fn is_authorized(req: &ServiceRequest) -> Result<String, CustomError> {
+fn is_authorized(req: &ServiceRequest) -> Result<ChatUser, CustomError> {
     info!("cookies {:?}", req.cookies());
     if let Some(token) = req.cookie("Authorization") {
         println!("Found Auth: {}", token);

@@ -1,5 +1,7 @@
 use crate::models::authentication::AuthenticationError;
 use crate::models::custom_error::CustomError;
+use crate::models::user::ChatUser;
+use cookie::time::Duration;
 use jsonwebtoken::*;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -15,32 +17,34 @@ pub struct Claims {
 
 impl Claims {
     pub fn new(sub: String, iat: u64, exp: u64) -> Self {
-        let iat = iat;
-        let exp = exp;
         Self { sub, iat, exp }
     }
 }
 
-pub fn generate_jwt<'a>(user_id: &'a str) -> Result<(String, u64), CustomError> {
+/// Generates a JWT using the RS256 algorithm
+pub fn generate_jwt(serialized_user: String) -> Result<(String, Duration), CustomError> {
     let priv_key = fs::read(Path::new("./key_pair/priv_key.pem"))?;
     let encoding_key = EncodingKey::from_rsa_pem(&priv_key)?;
     let now = jsonwebtoken::get_current_timestamp();
-    let expires = now + 60 * 60 * 24;
-    let claims = Claims::new(user_id.to_string(), now, expires);
+    let expiration_timestamp = now + 60 * 60 * 2;
+    let expires = Duration::hours(2);
+    let claims = Claims::new(serialized_user, now, expiration_timestamp);
     let token = encode(&Header::new(Algorithm::RS256), &claims, &encoding_key)?;
     Ok((token, expires))
 }
 
-pub fn verify<'a>(token: &'a str) -> Result<String, CustomError> {
+/// Verifies the token issued by the generate_jwt token.
+pub fn verify(token: &str) -> Result<ChatUser, CustomError> {
     // Fetch public key
     let pub_key = fs::read(Path::new("./key_pair/pub_key.pem"))?;
     let decoding_key = DecodingKey::from_rsa_pem(&pub_key)?;
-    
+
     let token_data =
-        jsonwebtoken::decode::<Claims>(token, &decoding_key, &Validation::new(Algorithm::RS256))?;
+        jsonwebtoken::decode::<Claims>(&token, &decoding_key, &Validation::new(Algorithm::RS256))?;
     // Check if the token expired
     if token_data.claims.exp < jsonwebtoken::get_current_timestamp() {
         return Err(AuthenticationError::TokenExpired.into());
     }
-    Ok(token_data.claims.sub)
+    let user: ChatUser = serde_json::from_str(&token_data.claims.sub)?;
+    Ok(user)
 }

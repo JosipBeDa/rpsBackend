@@ -1,24 +1,26 @@
-use super::models::{ClientMessage, Session, Users};
+use crate::models::custom_error::CustomError;
+
+use super::models::{ClientMessage, MessageData, Session, Users};
 use super::session::WsChatSession;
 use actix::prelude::*;
 use actix_web_actors::ws::WebsocketContext;
-use serde::de::DeserializeOwned;
 
 /// The ultimate handler function for the ezSocket protocol
-type ByteString = String;
-pub fn handle<T>(
-    text: ByteString,
+pub fn handle(
+    text: String,
     session: &mut WsChatSession,
     ctx: &mut WebsocketContext<WsChatSession>,
 ) {
-    let message: ClientMessage<T> = serde_json::from_str(&text.trim()).unwrap();
+    let message: ClientMessage = serde_json::from_str(&text.trim()).expect("Bad message");
     match message.header.as_ref() {
         "session" => {
+            let session_id = message.session_id;
             let address = ctx.address();
+            println!("message data: {:?}", session_id);
             session
                 .addr
                 .send(Session {
-                    session_id: message.session_id.clone(),
+                    session_id,
                     address: address.recipient(),
                 })
                 .into_actor(session)
@@ -34,8 +36,9 @@ pub fn handle<T>(
                     }
                     fut::ready(())
                 })
-                // Wait stops the actor from processing anything else until the future is done
                 .wait(ctx)
+
+            // Wait stops the actor from processing anything else until the future is done
         }
         "users" => {
             session
@@ -45,32 +48,32 @@ pub fn handle<T>(
                 .then(|result, actor, ctx| {
                     match result {
                         Ok(users) => {
-                            ctx.text(serde_json::to_string(&users).unwrap());
+                            let msg =
+                                generate_data_message(actor, MessageData::List(users), "users")
+                                    .unwrap();
+                            println!("{:?}", msg);
+                            ctx.text(msg);
                         }
                         _ => println!("Something is wrong"),
                     }
                     fut::ready(())
                 })
                 .wait(ctx);
-
-            ctx.text("joined");
         }
-        _ => println!("hello"),
+        _ => println!("Bad message"),
     }
 }
 
-fn generate_data_message<T>(
+fn generate_data_message(
     session: &WsChatSession,
-    data: Option<T>,
+    data: MessageData,
     header: &str,
-) -> ClientMessage<T>
-where
-    T: DeserializeOwned,
-{
-    ClientMessage {
-        session_id: session.id,
+) -> Result<String, CustomError> {
+    serde_json::to_string(&ClientMessage {
+        session_id: session.id.clone(),
         header: header.to_string(),
-        data,
+        data: Some(data),
         body: None,
-    }
+    })
+    .map_err(|e| CustomError::SerdeError(e))
 }

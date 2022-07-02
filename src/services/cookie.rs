@@ -1,14 +1,15 @@
 use cookie::{Cookie, CookieBuilder};
+use cookie::time::Duration;
 
 pub enum CookieType {
     Authorization,
     Session,
 }
 
-pub fn create_cookie<'a>(token: &'a str, ct: CookieType) -> Cookie<'a> {
+pub fn create_cookie<'a>(token: &'a str, exp_in: Duration, ct: CookieType) -> Cookie<'a> {
     match ct {
         CookieType::Authorization => CookieBuilder::new("Authorization", token)
-            .max_age(time::Duration::hours(2))
+            .max_age(exp_in)
             .same_site(cookie::SameSite::None)
             .http_only(true)
             .secure(true)

@@ -21,8 +21,8 @@ pub struct WsChatSession {
     pub hb: Instant,
     /// joined room
     pub room: String,
-    /// peer name
-    pub name: Option<String>,
+    /// The username of the connected client
+    pub username: String,
     /// Chat server
     pub addr: Addr<ChatServer>,
 }
@@ -103,7 +103,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
             }
             ws::Message::Text(text) => {
                 println!("{text}");
-                //ez_handler::handle(text, self, ctx);
+                ez_handler::handle(text.to_string(), self, ctx);
             }
             ws::Message::Binary(_) => println!("Unexpected binary"),
             ws::Message::Close(reason) => {

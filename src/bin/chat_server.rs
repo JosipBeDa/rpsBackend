@@ -33,13 +33,13 @@ async fn chat_route(
 ) -> Result<HttpResponse, CustomError> {
     if let Some(token) = req.cookie("Authorization") {
         match jwt::verify(token.value()) {
-            Ok(user_id) => {
+            Ok(chat_user) => {
                 match ws::WsResponseBuilder::new(
                     session::WsChatSession {
-                        id: user_id.clone(),
+                        id: chat_user.id.clone(),
+                        username: chat_user.username,
+                        room: chat_user.id,
                         hb: Instant::now(),
-                        room: user_id,
-                        name: None,
                         addr: server.get_ref().clone(),
                     },
                     &req,

@@ -1,5 +1,5 @@
 use actix::prelude::*;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize};
 
 /// Chat server sends these messages to session
 #[derive(Message)]
@@ -32,13 +32,24 @@ pub struct Disconnect {
 /// `room`: the room name
 #[derive(Message, Debug, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct ClientMessage<T> {
+pub struct ClientMessage {
     pub session_id: String,
     pub header: String,
     pub body: Option<String>,
-    pub data: Option<T>
+    pub data: Option<MessageData>,
+}
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MessageData {
+    String(String),
+    List(Vec<String>)
 }
 
+impl ToString for ClientMessage {
+    fn to_string(&self) -> String {
+        serde_json::to_string(self).expect("Couldn't serialize struct")
+    }
+}
 
 #[derive(Message, Debug, Serialize, Deserialize)]
 #[rtype(result = "()")]

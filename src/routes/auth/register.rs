@@ -1,6 +1,6 @@
 use crate::models::authentication::{AuthForm, AuthResponse, AuthenticationError};
 use crate::models::custom_error::CustomError;
-use crate::models::user::{NewUser, User};
+use crate::models::user::{NewUser, User, ChatUser};
 use crate::services::jwt;
 use crate::state::app::AppState;
 use actix_session::Session;
@@ -21,10 +21,11 @@ pub async fn handler(
     match User::find_by_uname(&db_connection, &user.username) {
         Ok(None) => {
             let new_user = NewUser::create_and_store(&db_connection, &user.username, &user.password)?;
-            let (token, _exp_in) = jwt::generate_jwt(&new_user.id)?;
+            let user = ChatUser {id: new_user.id, username: new_user.username, connected: true};
+            let (token, _exp_in) = jwt::generate_jwt(user.to_string())?;
             Ok(HttpResponseBuilder::new(reqwest::StatusCode::OK)
                 .insert_header(("Authorization", token))
-                .json(AuthResponse::succeed(new_user, "Success!")))
+                .json(AuthResponse::succeed(user, "Success!")))
         }
         Ok(Some(_)) => {
             Err(AuthenticationError::UserAlreadyExists.into())
