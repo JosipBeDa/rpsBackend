@@ -1,6 +1,8 @@
 use actix::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::models::user::ChatUser;
+
 /// Chat server sends these messages to session
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -13,7 +15,7 @@ pub struct Message(pub String);
 #[derive(Message, Debug)]
 #[rtype(result = "()")]
 pub struct Connect {
-    pub addr: Recipient<Message>,
+    pub user: ChatUser,
 }
 
 /// Session is disconnected

@@ -1,28 +1,30 @@
 //! `ChatServer` is an actor. It maintains list of connection client session.
 //! And manages available rooms. Peers send messages to other peers in same
 //! room through `ChatServer`.
+use crate::chat::ez_handler;
 use crate::chat::models::{
     ChatMessage, ClientMessage, Connect, Disconnect, Join, ListRooms, Message, Session, Users,
 };
+use crate::models::user::ChatUser;
 use actix::prelude::*;
+use colored::Colorize;
 use rand::{self, rngs::ThreadRng, Rng};
+use std::ops::{DerefMut, Deref};
 use std::{
     collections::{HashMap, HashSet},
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc,
+        Arc, Mutex,
     },
     //  time::{Instant, Duration}
 };
-use crate::chat::ez_handler;
-use crate::models::user::ChatUser;
 
 /// `ChatServer` manages chat rooms and responsible for coordinating chat session.
 #[derive(Debug)]
 pub struct ChatServer {
     sessions: HashMap<String, Recipient<Message>>,
     rooms: HashMap<String, HashSet<String>>,
-    visitor_count: Arc<AtomicUsize>,
+    users_connected: Arc<Mutex<Vec<ChatUser>>>,
 }
 
 impl ChatServer {
@@ -31,7 +33,7 @@ impl ChatServer {
         ChatServer {
             sessions: HashMap::new(),
             rooms: HashMap::new(),
-            visitor_count,
+            users_connected: Arc::new(Mutex::new(vec![])),
         }
     }
 }
@@ -69,8 +71,23 @@ impl Actor for ChatServer {
 /// Register a new session and assign unique id to this session
 impl Handler<Connect> for ChatServer {
     type Result = ();
-    fn handle(&mut self, _: Connect, _: &mut Context<Self>) -> Self::Result {
-        self.visitor_count.fetch_add(1, Ordering::SeqCst);
+    fn handle(&mut self, msg: Connect, _: &mut Context<Self>) -> Self::Result {
+        print!("{}", "USER CONNECTED : ".green());
+        println!("{:?}", msg.user);
+
+        let mut lock = self.users_connected.lock().unwrap();
+        let users = lock.deref_mut();
+
+        // Cycle through the users to see if they were previously connected
+        for (i, user) in users.clone().iter().enumerate() {
+            if user.id == msg.user.id {
+                // If they were just set their status to connected and return
+                users[i].connected = true;
+                return;
+            }
+        }
+        // Otherwise push them to the state
+        users.push(msg.user);
     }
 }
 
@@ -79,19 +96,29 @@ impl Handler<Disconnect> for ChatServer {
     type Result = ();
 
     fn handle(&mut self, msg: Disconnect, _: &mut Context<Self>) {
-        println!("Disconnect: {msg:?}");
+        print!("{}", "USER DISCONNECTED : ".red());
+        println!("{:?}", msg);
 
-        // remove address
+        // Remove the user from the registered sessions
         if self.sessions.remove(&msg.session_id).is_some() {
-            // remove session from all rooms
+            // Remove the session from all rooms
             for (id, sessions) in &mut self.rooms {
                 sessions.remove(id);
             }
         }
+        // Clean up all empty rooms
         self.clean_rooms();
 
-        if self.visitor_count.load(Ordering::SeqCst) > 0 {
-            self.visitor_count.fetch_sub(1, Ordering::SeqCst);
+        // Alter the state of connected users
+        let mut lock = self.users_connected.lock().unwrap();
+        let users = lock.deref_mut();
+
+        for (i, user) in users.clone().iter().enumerate() {
+            if user.id == msg.session_id {
+                if let Some(user) = users.get_mut(i) {
+                    user.connected = false;
+                }
+            }
         }
     }
 }
@@ -102,14 +129,20 @@ impl Handler<Session> for ChatServer {
     type Result = String;
 
     fn handle(&mut self, msg: Session, _: &mut Context<Self>) -> Self::Result {
+        print!("{}", "GOT SESSION MESSAGE : ".cyan());
+        println!("{:?}", &msg);
+
         let id = msg.session_id;
+
         self.sessions.insert(id.clone(), msg.address);
         self.rooms
             .entry(id.to_owned())
             .or_insert_with(HashSet::new)
             .insert(id.clone());
-        println!("Sess: {:?}", self.sessions);
-        println!("Rooms: {:?}", self.rooms);
+
+        println!("SESSIONS : {:?}", self.sessions);
+        println!("ROOMS : {:?}", self.rooms);
+
         id
     }
 }
@@ -117,10 +150,9 @@ impl Handler<Session> for ChatServer {
 impl Handler<Users> for ChatServer {
     type Result = Vec<String>;
     fn handle(&mut self, _: Users, _: &mut Context<Self>) -> Self::Result {
-        let mut users = vec![];
-        for session_id in self.sessions.clone().into_keys() {
-            users.push(session_id);
-        }
+        print!("{}", "SENDING USERS".cyan());
+        let lock = self.users_connected.lock().unwrap();
+        let users = lock.deref();
         users
     }
 }
@@ -148,7 +180,7 @@ impl Handler<ClientMessage> for ChatServer {
 
             if let Some(rooms) = self.rooms.get(&msg.session_id) {
                 if let Some(receiver) = rooms.get(&chat_message.receiver_id) {
-                    println!("SENDING MSG TO: {:?}", self.sessions.get(receiver));
+                    println!("SENDING MSG TO : {:?}", self.sessions.get(receiver));
                     //self.send_message(receiver, &body);
                 }
             }
@@ -190,7 +222,7 @@ impl Handler<Join> for ChatServer {
         }
         // send message to other users
         for room in rooms {
-           // self.send_message(&room, "Someone disconnected");
+            // self.send_message(&room, "Someone disconnected");
         }
 
         self.rooms
@@ -198,6 +230,6 @@ impl Handler<Join> for ChatServer {
             .or_insert_with(HashSet::new)
             .insert(id.clone());
 
-       // self.send_message(&name, "Someone connected");
+        // self.send_message(&name, "Someone connected");
     }
 }

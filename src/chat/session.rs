@@ -1,10 +1,12 @@
-use super::models::{
-    ChatMessage, ClientMessage, Disconnect, Join, ListRooms, Message, Session, Users,
-};
 use super::ez_handler;
+use super::models::{
+    ChatMessage, ClientMessage, Connect, Disconnect, Join, ListRooms, Message, Session, Users,
+};
 use super::server::ChatServer;
+use crate::models::user::ChatUser;
 use actix::prelude::*;
 use actix_web_actors::ws;
+use colored::Colorize;
 use std::time::{Duration, Instant};
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -14,15 +16,15 @@ const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Debug)]
 pub struct WsChatSession {
-    /// unique session id
+    /// Unique session id
     pub id: String,
+    /// The username of the connected client
+    pub username: String,
+    /// Joined room
+    pub room: String,
     /// Client must send ping at least once per 10 seconds (CLIENT_TIMEOUT),
     /// otherwise we drop connection.
     pub hb: Instant,
-    /// joined room
-    pub room: String,
-    /// The username of the connected client
-    pub username: String,
     /// Chat server
     pub addr: Addr<ChatServer>,
 }
@@ -59,10 +61,21 @@ impl Actor for WsChatSession {
     fn started(&mut self, ctx: &mut Self::Context) {
         // we'll start heartbeat process on session start.
         self.hb(ctx);
+        print!("{}", "ACTOR ID CONNECT: ".yellow());
+        println!("{:?}", self.id);
+        self.addr.do_send(Connect {
+            user: ChatUser {
+                id: self.id.clone(),
+                username: self.username.clone(),
+                connected: true,
+            },
+        })
     }
 
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
         // notify chat server
+        print!("{}", "ACTOR ID DISCONNECT: ".yellow());
+        println!("{:?}", self.id);
         self.addr.do_send(Disconnect {
             session_id: self.id.clone(),
         });
@@ -94,7 +107,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
         // println!("WEBSOCKET MESSAGE: {msg:?}");
         match msg {
             ws::Message::Ping(msg) => {
-                println!("{msg:?}");
                 self.hb = Instant::now();
                 ctx.pong(&msg);
             }
@@ -102,7 +114,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
                 self.hb = Instant::now();
             }
             ws::Message::Text(text) => {
-                println!("{text}");
                 ez_handler::handle(text.to_string(), self, ctx);
             }
             ws::Message::Binary(_) => println!("Unexpected binary"),
@@ -116,5 +127,4 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
             ws::Message::Nop => (),
         }
     }
-
 }

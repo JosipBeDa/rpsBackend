@@ -4,6 +4,7 @@ use super::models::{ClientMessage, MessageData, Session, Users};
 use super::session::WsChatSession;
 use actix::prelude::*;
 use actix_web_actors::ws::WebsocketContext;
+use colored::Colorize;
 
 /// The ultimate handler function for the ezSocket protocol
 pub fn handle(
@@ -16,7 +17,6 @@ pub fn handle(
         "session" => {
             let session_id = message.session_id;
             let address = ctx.address();
-            println!("message data: {:?}", session_id);
             session
                 .addr
                 .send(Session {
@@ -51,7 +51,6 @@ pub fn handle(
                             let msg =
                                 generate_data_message(actor, MessageData::List(users), "users")
                                     .unwrap();
-                            println!("{:?}", msg);
                             ctx.text(msg);
                         }
                         _ => println!("Something is wrong"),

@@ -41,7 +41,7 @@ impl std::fmt::Display for AuthenticationError {
 impl AuthResponse {
     pub fn succeed(user: ChatUser, message: &'static str) -> Self {
         Self {
-            session_id: Some(generate_session_id()),
+            session_id: Some(user.id.clone()),
             ok: true,
             message,
             user: Some(user),

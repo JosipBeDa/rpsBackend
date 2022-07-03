@@ -15,6 +15,7 @@ use lib::chat::*;
 use lib::models::authentication::AuthenticationError;
 use lib::models::custom_error::CustomError;
 use lib::services::jwt;
+use colored::Colorize;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct SessionID {
