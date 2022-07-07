@@ -1,4 +1,3 @@
-use crate::services::cookie::generate_session_id;
 use serde::{Deserialize, Serialize};
 
 use super::user::ChatUser;

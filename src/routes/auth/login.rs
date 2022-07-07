@@ -3,14 +3,12 @@ use crate::models::user::{User};
 use crate::services::cookie::*;
 use crate::services::jwt;
 use crate::state::app::AppState;
-use actix_session::Session;
 use actix_web::{web, HttpResponseBuilder as Response, Responder};
 use reqwest::StatusCode;
 
 pub async fn handler(
     auth_form: web::Form<AuthForm>,
     state: web::Data<AppState>,
-    session: Session,
 ) -> impl Responder {
     let db_connection = match state.db_pool.get() {
         Ok(conn) => conn,

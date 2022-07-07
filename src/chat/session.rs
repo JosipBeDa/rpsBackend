@@ -1,54 +1,57 @@
 use super::ez_handler;
-use super::models::{
-    ChatMessage, ClientMessage, Connect, Disconnect, Join, ListRooms, Message, Session, Users,
-};
+use super::models::{Connect, Disconnect, Message};
 use super::server::ChatServer;
 use crate::models::user::ChatUser;
 use actix::prelude::*;
 use actix_web_actors::ws;
 use colored::Colorize;
 use std::time::{Duration, Instant};
+
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 /// How long before lack of client response causes a timeout
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
-/// Clean empty rooms
 
+/// Session instance. Gets created each time a client connects.
+/// 
+/// Every session instance can conceptually be thought of as the intermediary
+/// between the client and the server. The session actor receives messages
+/// from the client and relays them to the chat server actor for processing in
+/// the form of a future. The session then awaits the result of that future
+/// and sends back a message to the client.
 #[derive(Debug)]
 pub struct WsChatSession {
-    /// Unique session id
+    /// Unique session id obtained from the Authorization cookie
     pub id: String,
     /// The username of the connected client
     pub username: String,
-    /// Joined room
+    /// The currently joined room
     pub room: String,
-    /// Client must send ping at least once per 10 seconds (CLIENT_TIMEOUT),
-    /// otherwise we drop connection.
+    /// The heartbeat. A ping message gets sent every `HEARTBEAT_INTERVAL` seconds,
+    /// if a pong isn't received for `CLIENT_TIMEOUT` seconds, drop the connection
     pub hb: Instant,
-    /// Chat server
+    /// The address of the chat server. Every session sends their messages to here for processing.
     pub addr: Addr<ChatServer>,
 }
 
 impl WsChatSession {
-    /// helper method that sends ping to client every second.
-    ///
-    /// also this method checks heartbeats from client
-    fn hb(&self, ctx: &mut ws::WebsocketContext<Self>) {
-        ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
-            // check client heartbeats
+    /// Sends ping to the client every `HEARTBEAT_INTERVAL` seconds
+    fn hb(&self, context: &mut ws::WebsocketContext<Self>) {
+        context.run_interval(HEARTBEAT_INTERVAL, |act, context| {
+            // Check if the duration is greater than the timeout
             if Instant::now().duration_since(act.hb) > CLIENT_TIMEOUT {
-                // heartbeat timed out
+                // Heartbeat timed out
                 println!("Websocket Client heartbeat failed, disconnecting!");
-                // notify chat server
+                // Notify chat server
                 act.addr.do_send(Disconnect {
                     session_id: act.id.clone(),
                 });
-                // stop actor
-                ctx.stop();
-                // don't try to send a ping
+                // Stop actor
+                context.stop();
+                // Don't try to send a ping
                 return;
             }
-            ctx.ping(b"");
+            context.ping(b"");
         });
     }
 }
@@ -57,11 +60,11 @@ impl Actor for WsChatSession {
     type Context = ws::WebsocketContext<Self>;
 
     /// Method is called on actor start.
-    /// We register ws session with ChatServer
-    fn started(&mut self, ctx: &mut Self::Context) {
-        // we'll start heartbeat process on session start.
-        self.hb(ctx);
-        print!("{}", "ACTOR ID CONNECT: ".yellow());
+    /// We register the session with ChatServer
+    fn started(&mut self, context: &mut Self::Context) {
+        // Start the heartbeat process on session start.
+        self.hb(context);
+        print!("{}", "ACTOR ID CONNECT: ".green());
         println!("{:?}", self.id);
         self.addr.do_send(Connect {
             user: ChatUser {
@@ -73,8 +76,7 @@ impl Actor for WsChatSession {
     }
 
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
-        // notify chat server
-        print!("{}", "ACTOR ID DISCONNECT: ".yellow());
+        print!("{}", "ACTOR ID DISCONNECT: ".red());
         println!("{:?}", self.id);
         self.addr.do_send(Disconnect {
             session_id: self.id.clone(),
@@ -83,46 +85,43 @@ impl Actor for WsChatSession {
     }
 }
 
-/// Handle messages from chat server, we simply send it to peer websocket
+/// The chat server can process messages 
 impl Handler<Message> for WsChatSession {
     type Result = ();
-
-    fn handle(&mut self, msg: Message, ctx: &mut Self::Context) {
-        println!("HANDLER<MESSAGE> 4 CHATSESSION: {:?}", msg.0);
-        ctx.text(msg.0);
+    fn handle(&mut self, msg: Message, context: &mut Self::Context) {
+        context.text(msg.0);
     }
 }
 
 /// WebSocket message handler
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
-    fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
+    fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, context: &mut Self::Context) {
         let msg = match msg {
+            Ok(msg) => msg,
             Err(_) => {
-                ctx.stop();
+                context.stop();
                 return;
             }
-            Ok(msg) => msg,
         };
 
-        // println!("WEBSOCKET MESSAGE: {msg:?}");
         match msg {
             ws::Message::Ping(msg) => {
                 self.hb = Instant::now();
-                ctx.pong(&msg);
+                context.pong(&msg);
             }
             ws::Message::Pong(_) => {
                 self.hb = Instant::now();
             }
             ws::Message::Text(text) => {
-                ez_handler::handle(text.to_string(), self, ctx);
+                ez_handler::handle::<String>(text.to_string(), self, context);
             }
             ws::Message::Binary(_) => println!("Unexpected binary"),
             ws::Message::Close(reason) => {
-                ctx.close(reason);
-                ctx.stop();
+                context.close(reason);
+                context.stop();
             }
             ws::Message::Continuation(_) => {
-                ctx.stop();
+                context.stop();
             }
             ws::Message::Nop => (),
         }

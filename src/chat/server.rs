@@ -3,53 +3,114 @@
 //! room through `ChatServer`.
 use crate::chat::ez_handler;
 use crate::chat::models::{
-    ChatMessage, ClientMessage, Connect, Disconnect, Join, ListRooms, Message, Session, Users,
+    ChatMessage, ClientMessage, Connect, Disconnect, Join, LeL, ListRooms, LoL, Message,
+    MessageData, Session, Users,
 };
 use crate::models::user::ChatUser;
 use actix::prelude::*;
 use colored::Colorize;
-use rand::{self, rngs::ThreadRng, Rng};
-use std::ops::{DerefMut, Deref};
+use serde::Serialize;
 use std::{
     collections::{HashMap, HashSet},
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc, Mutex,
-    },
     //  time::{Instant, Duration}
 };
 
-/// `ChatServer` manages chat rooms and responsible for coordinating chat session.
+/// Shortcut for implementing the `actix::Handler` trait for any given struct that implements the
+/// `actix::Message` trait. Used when we have to access the contents of the message.
+#[macro_export]
+macro_rules! ez_register {
+    ($msg: ty,$func: ident, $ret: ty) => {
+        impl actix::Handler<$msg> for crate::chat::server::ChatServer {
+            type Result = $ret;
+            fn handle(&mut self, msg: $msg, _: &mut Context<Self>) -> Self::Result {
+                $func(msg)
+            }
+        }
+    };
+}
+/// Shortcut for implementing the `actix::Handler` trait for any given struct that implements the
+/// `actix::Message` trait. Used when we have don't need the message contents, cheaper because we don't
+/// create an extra function pointer.
+#[macro_export]
+macro_rules! ez_register_block {
+    ($msg: ty, $blck: block) => {
+        impl actix::Handler<$msg> for crate::chat::server::ChatServer {
+            type Result = ();
+            fn handle(&mut self, _: $msg, _: &mut Context<Self>) -> Self::Result $blck
+        }
+    };
+}
+
+/// `ChatServer` manages chat rooms and responsible for coordinating chat sessions.
+/// 
+/// It is the actor responsible for keeping track of which session ID points to which
+/// actor address and which sessions are communicating with one another. It also keeps track
+/// of currently connected users and processes messages from other actors.
+/// 
+/// Since it is also an actor, it can send messages to other actors, namely the
+/// session actors which then finally send the message to the client.
 #[derive(Debug)]
 pub struct ChatServer {
+    /// Sessions map a session ID with its actor address
     sessions: HashMap<String, Recipient<Message>>,
+    /// Rooms map a session ID to other session IDs
     rooms: HashMap<String, HashSet<String>>,
-    users_connected: Arc<Mutex<Vec<ChatUser>>>,
+    /// The total connected users
+    users_connected: Vec<ChatUser>,
 }
 
 impl ChatServer {
-    pub fn new(visitor_count: Arc<AtomicUsize>) -> ChatServer {
-        // default room
+    pub fn new() -> ChatServer {
         ChatServer {
             sessions: HashMap::new(),
             rooms: HashMap::new(),
-            users_connected: Arc::new(Mutex::new(vec![])),
+            users_connected: vec![],
         }
     }
 }
 
+pub fn reg() {
+   // ez_register!(LoL, test_macro, ());
+    ez_register!(LeL, test_macro2, String);
+    ez_register_block!(LoL, {for _ in 0..10 {println!("LO")}});
+}
+
+fn test_macro<M>(msg: M)
+where
+    M: actix::Message,
+{
+    for _ in 0..5 {
+        print!("LO-");
+    }
+}
+fn test_macro2<M>(msg: M) -> String
+where
+    M: actix::Message,
+{
+    "Helloworld".to_string()
+}
+
 impl ChatServer {
-    /// Send message to all users in the room
-    fn send_message(&self, receiver: &str, message: ClientMessage) {
+    /// Send a message to a specific actor.
+    fn send_message(&self, receiver: &str, message: String) {
         if let Some(sessions) = self.rooms.get(receiver) {
             for id in sessions {
-                if let Some(addr) = self.sessions.get(id) {
-                    let _ = addr.do_send(Message(message.to_string()));
+                if let Some(address) = self.sessions.get(id) {
+                    let _ = address.do_send(Message(message.clone()));
                 }
             }
         }
     }
+    /// Send message to all actors
+    fn send_global(&self, message: String) {
+        println!("SENDING GLOBAL : {:?}", message);
+        for address in self.sessions.values() {
+            println!("TO : {:?}", address);
+            address.do_send(Message(message.clone()));
+        }
+    }
 
+    /// Clean empty rooms
     fn clean_rooms(&mut self) {
         for room in self.rooms.clone().into_keys() {
             if let Some(sessions) = self.rooms.get(&room) {
@@ -63,35 +124,39 @@ impl ChatServer {
 
 /// Make actor from `ChatServer`
 impl Actor for ChatServer {
-    /// We are going to use simple Context, we just need ability to communicate with other actors.
     type Context = Context<Self>;
 }
 
-/// Handler for Connect message.
-/// Register a new session and assign unique id to this session
+/// Message received upon connection with client. Adds the newly connected user to the
+/// connected_users vec if they are new, otherwise sets their status to connected
 impl Handler<Connect> for ChatServer {
     type Result = ();
     fn handle(&mut self, msg: Connect, _: &mut Context<Self>) -> Self::Result {
         print!("{}", "USER CONNECTED : ".green());
         println!("{:?}", msg.user);
 
-        let mut lock = self.users_connected.lock().unwrap();
-        let users = lock.deref_mut();
+        self.send_global(
+            ez_handler::generate_data_message(
+                MessageData::List(vec![msg.user.clone()]),
+                "user_connected",
+            )
+            .unwrap(),
+        );
 
         // Cycle through the users to see if they were previously connected
-        for (i, user) in users.clone().iter().enumerate() {
+        for (i, user) in self.users_connected.clone().iter().enumerate() {
             if user.id == msg.user.id {
                 // If they were just set their status to connected and return
-                users[i].connected = true;
+                self.users_connected[i].connected = true;
                 return;
             }
         }
         // Otherwise push them to the state
-        users.push(msg.user);
+        self.users_connected.push(msg.user);
     }
 }
 
-/// Handler for Disconnect message.
+/// Message received when an actor gets dropped. Sets users' connected status to false.
 impl Handler<Disconnect> for ChatServer {
     type Result = ();
 
@@ -106,16 +171,11 @@ impl Handler<Disconnect> for ChatServer {
                 sessions.remove(id);
             }
         }
-        // Clean up all empty rooms
         self.clean_rooms();
 
-        // Alter the state of connected users
-        let mut lock = self.users_connected.lock().unwrap();
-        let users = lock.deref_mut();
-
-        for (i, user) in users.clone().iter().enumerate() {
+        for (i, user) in self.users_connected.clone().iter().enumerate() {
             if user.id == msg.session_id {
-                if let Some(user) = users.get_mut(i) {
+                if let Some(user) = self.users_connected.get_mut(i) {
                     user.connected = false;
                 }
             }
@@ -124,7 +184,7 @@ impl Handler<Disconnect> for ChatServer {
 }
 
 /// Gets called when connection is established, returns the session ID after
-/// registering the session and joining its own room
+/// registering the session and joining its own room.
 impl Handler<Session> for ChatServer {
     type Result = String;
 
@@ -147,21 +207,20 @@ impl Handler<Session> for ChatServer {
     }
 }
 
+/// Sends a list of all the users with established sessions with the server
 impl Handler<Users> for ChatServer {
-    type Result = Vec<String>;
+    type Result = Vec<ChatUser>;
     fn handle(&mut self, _: Users, _: &mut Context<Self>) -> Self::Result {
         print!("{}", "SENDING USERS".cyan());
-        let lock = self.users_connected.lock().unwrap();
-        let users = lock.deref();
-        users
+        self.users_connected.clone()
     }
 }
 
-/// Handler for Message message.
-impl Handler<ClientMessage> for ChatServer {
-    type Result = MessageResult<ClientMessage>;
+/// Handler for the actual
+impl<T: Serialize> Handler<ClientMessage<T>> for ChatServer {
+    type Result = MessageResult<ClientMessage<T>>;
 
-    fn handle(&mut self, msg: ClientMessage, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: ClientMessage<T>, _: &mut Context<Self>) -> Self::Result {
         if let Some(ref body) = msg.body {
             let chat_message: ChatMessage = match serde_json::from_str(&body) {
                 Ok(msg) => msg,
@@ -176,9 +235,9 @@ impl Handler<ClientMessage> for ChatServer {
                     }
                 }
             };
-            //println!("MSG: {:?}", &msg);
+            println!("MSG: {:?}", &msg.header);
 
-            if let Some(rooms) = self.rooms.get(&msg.session_id) {
+            if let Some(rooms) = self.rooms.get(&chat_message.sender_id) {
                 if let Some(receiver) = rooms.get(&chat_message.receiver_id) {
                     println!("SENDING MSG TO : {:?}", self.sessions.get(receiver));
                     //self.send_message(receiver, &body);

@@ -34,20 +34,19 @@ pub struct Disconnect {
 /// `room`: the room name
 #[derive(Message, Debug, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct ClientMessage {
-    pub session_id: String,
+pub struct ClientMessage<T: Serialize> {
     pub header: String,
     pub body: Option<String>,
-    pub data: Option<MessageData>,
+    pub data: Option<MessageData<T>>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum MessageData {
+pub enum MessageData<T> where T: Serialize {
     String(String),
-    List(Vec<String>)
+    List(Vec<T>)
 }
 
-impl ToString for ClientMessage {
+impl<T> ToString for ClientMessage<T> where T: Serialize {
     fn to_string(&self) -> String {
         serde_json::to_string(self).expect("Couldn't serialize struct")
     }
@@ -82,7 +81,7 @@ pub struct Session {
 
 pub struct Users;
 impl actix::Message for Users {
-    type Result = Vec<String>;
+    type Result = Vec<ChatUser>;
 }
 
 /// Join room, if room does not exists create new one.
@@ -95,3 +94,9 @@ pub struct Join {
     pub id: String,
     pub room_name: String,
 }
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct LoL {}
+#[derive(Message)]
+#[rtype(result = "String")]
+pub struct LeL;
