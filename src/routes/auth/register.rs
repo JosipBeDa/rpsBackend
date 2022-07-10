@@ -16,8 +16,6 @@ pub async fn handler(
         Ok(conn) => conn,
         Err(_) => return Err(CustomError::R2D2Error),
     };
-    println!("Session: {:?}", session.entries());
-
     match User::find_by_uname(&db_connection, &user.username) {
         Ok(None) => {
             let new_user = NewUser::create_and_store(&db_connection, &user.username, &user.password)?;

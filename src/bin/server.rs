@@ -10,7 +10,7 @@ use tracing::info;
 use env_logger::Env;
 
 pub async fn hello_world() -> impl actix_web::Responder {
-    "Hello world!"
+    "Sanity works!"
 }
 
 #[actix_web::main]
@@ -22,6 +22,7 @@ async fn main() -> std::io::Result<()> {
     let state = Data::new(state::app::AppState::initialize());
     let config = Config::from_env().expect("Couldn't construct configuration");
     let session_secret = Key::generate();
+
     info!(
         "Starting server on {}:{}",
         config.get_address().0,
@@ -30,17 +31,16 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            .wrap(Logger::default())
-            .wrap(Logger::new("%a %t '%r' %s %b '%{Referer}i' %T"))
-            .app_data(state.clone())
-            .configure(application::init::setup_routes)
-            .route("/hello", web::get().to(hello_world))
-            .wrap(
-                SessionMiddleware::builder(CookieSessionStore::default(), session_secret.clone())
-                    .cookie_same_site(SameSite::None)
-                    .build(),
-            )
-            .wrap(application::init::setup_cors())
+        .app_data(state.clone())
+        .configure(application::init::setup_routes)
+        .route("/hello", web::get().to(hello_world))
+        .wrap(
+            SessionMiddleware::builder(CookieSessionStore::default(), session_secret.clone())
+            .cookie_same_site(SameSite::None)
+            .build(),
+        )
+        .wrap(application::init::setup_cors())
+        .wrap(Logger::default())
     })
     .bind(config.get_address())?
     .run()

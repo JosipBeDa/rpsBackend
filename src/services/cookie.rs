@@ -1,26 +1,19 @@
 use cookie::{Cookie, CookieBuilder};
-use cookie::time::Duration;
+
+use crate::TOKEN_DURATION;
 
 pub enum CookieType {
     Authorization,
     Session,
 }
 
-pub fn create_cookie<'a>(token: &'a str, exp_in: Duration, ct: CookieType) -> Cookie<'a> {
-    match ct {
-        CookieType::Authorization => CookieBuilder::new("Authorization", token)
-            .max_age(exp_in)
-            .same_site(cookie::SameSite::None)
-            .http_only(true)
-            .secure(true)
-            .finish(),
-        CookieType::Session => CookieBuilder::new("session_id", token)
-            .max_age(time::Duration::hours(2))
-            .same_site(cookie::SameSite::None)
-            .http_only(false)
-            .secure(false)
-            .finish(),
-    }
+pub fn create_cookie<'a>(token: &'a str) -> Cookie<'a> {
+    CookieBuilder::new("Authorization", token)
+        .max_age(TOKEN_DURATION)
+        .same_site(cookie::SameSite::None)
+        .http_only(true)
+        .secure(true)
+        .finish()
 }
 
 pub fn generate_session_id() -> String {

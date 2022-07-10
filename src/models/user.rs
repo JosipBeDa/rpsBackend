@@ -1,5 +1,6 @@
 use diesel::{prelude::*, ExpressionMethods, Insertable, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
+use tracing::log::warn;
 use uuid::Uuid;
 
 #[derive(Queryable, PartialEq, Debug, Clone, Serialize, Deserialize)]
@@ -64,7 +65,7 @@ impl NewUser {
         let hashed_pw = match hash(password, bcrypt::DEFAULT_COST) {
             Ok(hashed) => hashed,
             Err(e) => {
-                println!("Hashing password error: {:?}", e);
+                warn!("Hashing password error: {:?}", e);
                 return Err(diesel::result::Error::__Nonexhaustive);
             }
         };

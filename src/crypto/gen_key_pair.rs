@@ -2,6 +2,8 @@ use rand;
 use rsa::{
     pkcs1, pkcs1::EncodeRsaPublicKey, pkcs8, pkcs8::EncodePrivateKey, RsaPrivateKey, RsaPublicKey,
 };
+use tracing::info;
+use tracing::log::warn;
 use std::fs;
 use std::path::Path;
 
@@ -18,12 +20,12 @@ pub fn generate_rsa_key_pair() -> Result<(), WriteError> {
     let bits = 2048;
     let priv_key = RsaPrivateKey::new(&mut rng, bits).expect("Failed to generate private key");
     let pub_key = RsaPublicKey::from(&priv_key);
-    println!("Attempting to remove 'key_pair' directory");
+    info!("Attempting to remove 'key_pair' directory");
     match fs::remove_dir_all(Path::new("./key_pair")) {
-        Ok(()) => println!("Deleting old key_pair directory"),
-        Err(e) => println!("{}.", e),
+        Ok(()) => info!("Deleting old key_pair directory"),
+        Err(e) => warn!("{}.", e),
     }
-    println!("Creating new directory 'key_pair'");
+    info!("Creating new directory 'key_pair'");
     if let Err(e) = fs::create_dir(Path::new("./key_pair")) {
         return Err(WriteError::FileSystemError(e));
     }

@@ -1,11 +1,13 @@
+use crate::models::user::ChatUser;
 use crate::models::{authentication::AuthenticationError, custom_error::CustomError};
 use crate::services::jwt;
-use crate::models::user::ChatUser;
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
+use colored::Colorize;
 use futures_util::future::LocalBoxFuture;
 use std::future::{ready, Ready};
 use std::task::{Context, Poll};
 use tracing::info;
+use tracing::log::warn;
 
 pub struct LoggedGuard;
 
@@ -46,14 +48,18 @@ where
         match is_authorized(&req) {
             Ok(chat_user) => {
                 let fut = self.service.call(req);
-                println!("chat_user: {:?}", chat_user);
+                info!(
+                    "{}{:?}",
+                    "Authentication successful, received : ".green(),
+                    chat_user
+                );
                 Box::pin(async move {
                     let res = fut.await?;
                     Ok(res)
                 })
             }
             Err(e) => Box::pin(async move {
-                info!("Entered error arm with {:?}", e);
+                warn!("{}{:?}", "ERROR : ".red(), e);
                 Ok(ServiceResponse::new(
                     req.into_parts().0,
                     actix_web::HttpResponse::Unauthorized().json("Unauthorized"),
@@ -64,9 +70,8 @@ where
 }
 
 fn is_authorized(req: &ServiceRequest) -> Result<ChatUser, CustomError> {
-    info!("cookies {:?}", req.cookies());
+    info!("{}{:?}", "Got cookies : ".blue(), req.cookies());
     if let Some(token) = req.cookie("Authorization") {
-        println!("Found Auth: {}", token);
         match jwt::verify(token.value()) {
             Ok(sub) => {
                 return Ok(sub);
@@ -74,6 +79,6 @@ fn is_authorized(req: &ServiceRequest) -> Result<ChatUser, CustomError> {
             Err(e) => return Err(e),
         }
     } else {
-        return Err(AuthenticationError::UserNotFound.into());
+        return Err(AuthenticationError::Unauthorized.into());
     }
 }

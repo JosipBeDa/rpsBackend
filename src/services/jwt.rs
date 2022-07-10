@@ -1,9 +1,11 @@
+use crate::TOKEN_DURATION;
 use crate::models::authentication::AuthenticationError;
 use crate::models::custom_error::CustomError;
 use crate::models::user::ChatUser;
 use cookie::time::Duration;
 use jsonwebtoken::*;
 use serde::{Deserialize, Serialize};
+use tracing::{debug};
 use std::fs;
 use std::path::Path;
 
@@ -26,8 +28,10 @@ pub fn generate_jwt(serialized_user: String) -> Result<(String, Duration), Custo
     let priv_key = fs::read(Path::new("./key_pair/priv_key.pem"))?;
     let encoding_key = EncodingKey::from_rsa_pem(&priv_key)?;
     let now = jsonwebtoken::get_current_timestamp();
-    let expiration_timestamp = now + 60 * 60 * 2;
-    let expires = Duration::hours(2);
+    let expiration_timestamp = now + TOKEN_DURATION.whole_seconds() as u64;
+    let expires = TOKEN_DURATION;
+    debug!("NOW : {now}");
+    debug!("EXPIRES : {expiration_timestamp}");
     let claims = Claims::new(serialized_user, now, expiration_timestamp);
     let token = encode(&Header::new(Algorithm::RS256), &claims, &encoding_key)?;
     Ok((token, expires))

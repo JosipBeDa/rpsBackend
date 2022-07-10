@@ -4,7 +4,7 @@ use reqwest::Client;
 pub fn initialize() -> Client {
     dotenv().ok();
     
-    //Set the headers for the reqwest client builder, will need to be overriden if they mismatch
+    //Set the default headers for the reqwest client builder, will need to be overriden if they mismatch
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
         "Content-type",

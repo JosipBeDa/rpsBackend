@@ -12,7 +12,7 @@ pub enum CustomError {
     AlreadyExistsError,
     AuthenticationError(AuthenticationError),
     SerdeError(serde_json::error::Error),
-    ActixError(actix_web::Error)
+    ActixError(actix_web::Error),
 }
 
 impl From<AuthenticationError> for CustomError {
@@ -26,6 +26,7 @@ impl Display for CustomError {
         write!(f, "There was an error: {}", self)
     }
 }
+
 impl From<actix_web::Error> for CustomError {
     fn from(error: actix_web::Error) -> CustomError {
         CustomError::ActixError(error)
