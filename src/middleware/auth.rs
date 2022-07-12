@@ -1,5 +1,5 @@
+use crate::models::error::{AuthenticationError, GlobalError};
 use crate::models::user::ChatUser;
-use crate::models::{authentication::AuthenticationError, custom_error::CustomError};
 use crate::services::jwt;
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
 use colored::Colorize;
@@ -62,15 +62,14 @@ where
                 warn!("{}{:?}", "ERROR : ".red(), e);
                 Ok(ServiceResponse::new(
                     req.into_parts().0,
-                    actix_web::HttpResponse::Unauthorized().json("Unauthorized"),
+                    GlobalError::respond(e),
                 ))
             }),
         }
     }
 }
 
-fn is_authorized(req: &ServiceRequest) -> Result<ChatUser, CustomError> {
-    info!("{}{:?}", "Got cookies : ".blue(), req.cookies());
+fn is_authorized(req: &ServiceRequest) -> Result<ChatUser, GlobalError> {
     if let Some(token) = req.cookie("Authorization") {
         match jwt::verify(token.value()) {
             Ok(sub) => {
@@ -79,6 +78,6 @@ fn is_authorized(req: &ServiceRequest) -> Result<ChatUser, CustomError> {
             Err(e) => return Err(e),
         }
     } else {
-        return Err(AuthenticationError::Unauthorized.into());
+        return Err(AuthenticationError::InvalidToken.into());
     }
 }

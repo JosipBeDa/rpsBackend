@@ -42,12 +42,14 @@ impl User {
             Err(e) => Err(e),
         }
     }
+    /// Fetch all users from the database.
     pub fn find_all(conn: &PgConnection, limit: i64) -> Result<Vec<User>, diesel::result::Error> {
         match users::table.limit(limit).load(conn) {
             Ok(result) => Ok(result),
             Err(e) => Err(e),
         }
     }
+    /// Converts a User struct from the database to the user struct used by the chat server
     pub fn convert(self) -> ChatUser {
         ChatUser { id: self.id, username: self.username, connected: false }
     }
@@ -73,7 +75,7 @@ impl NewUser {
         let id = Uuid::new_v4().to_string();
 
         let new_user = Self {
-            id: id,
+            id,
             username: username.to_string(),
             password: hashed_pw,
         };

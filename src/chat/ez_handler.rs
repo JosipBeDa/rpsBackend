@@ -1,11 +1,17 @@
-use super::models::{ChatMessage, ClientMessage, MessageData};
+//! Every text message the `WsChatSession` stream handler receiver is sent to this
+//! handler for processing.
+use super::models::{ChatMessage, ClientMessage, Join, MessageData, Read};
 use super::session::WsChatSession;
-use crate::models::custom_error::CustomError;
+use crate::models::error::GlobalError;
+use actix::prelude::*;
 use actix_web_actors::ws::WebsocketContext;
+use colored::Colorize;
 use serde::{de::DeserializeOwned, Serialize};
-use tracing::log::warn;
+use serde_json::Value;
+use tracing::log::{info, warn};
 
-/// The ultimate handler function for the ezSocket protocol
+/// Parses the text message to a `ClientMessage` struct and send the appropriate message to
+/// the server.
 pub fn handle<T>(
     text: String,
     session: &mut WsChatSession,
@@ -13,22 +19,62 @@ pub fn handle<T>(
 ) where
     T: Serialize + DeserializeOwned,
 {
-    let (header, data) = parse_message::<ChatMessage>(text);
+    let header = get_header(text.clone());
+    info!("{}{:?}", "GOT HEADER : ".yellow(), header);
     match header.as_ref() {
         "chat_message" => {
-            if let MessageData::ChatMessage(chat_message) = data {
+            let message = parse_message::<ChatMessage>(text);
+            if let MessageData::ChatMessage(chat_message) = message.data.clone() {
                 let client_message = ClientMessage::<ChatMessage> {
-                    header,
+                    header: message.header.clone(),
                     data: MessageData::ChatMessage(chat_message),
                 };
+                // Send the message to the server
                 session.address.do_send(client_message);
             }
+        }
+        "join" => {
+            let message = parse_message::<Join>(text);
+            if let MessageData::Join(message) = message.data {
+                session
+                    .address
+                    .send(Join {
+                        id: message.id,
+                        room_id: message.room_id,
+                    })
+                    .into_actor(session)
+                    .then(|res, _, ctx| {
+                        match res {
+                            Ok(messages) => {
+                                if messages.len() > 0 {
+                                    ctx.text(
+                                        generate_message("read", MessageData::List(messages))
+                                            .unwrap(),
+                                    );
+                                }
+                            }
+                            Err(_) => warn!("SOMETHING WENT WRONG"),
+                        }
+                        fut::ready(())
+                    })
+                    .wait(context)
+            }
+        }
+        "read" => {
+            let message = parse_message::<ChatMessage>(text);
+            if let MessageData::List::<ChatMessage>(messages) = message.data {
+                session.address.do_send(Read { messages })
+            }
+        }
+        "lol" => {
+            context.text(generate_message::<String>("lel", MessageData::String(String::from("lel"))).unwrap())
         }
         _ => warn!("Bad message"),
     }
 }
 
-pub fn generate_message<T>(data: MessageData<T>, header: &str) -> Result<String, CustomError>
+/// Generate a `ClientMessage` with the given data.
+pub fn generate_message<T>(header: &str, data: MessageData<T>) -> Result<String, GlobalError>
 where
     T: Serialize,
 {
@@ -36,10 +82,19 @@ where
         header: header.to_string(),
         data,
     })
-    .map_err(|e| CustomError::SerdeError(e))
+    .map_err(|e| GlobalError::SerdeError(e))
 }
 
-pub fn parse_message<T: DeserializeOwned + Serialize>(message: String) -> (String, MessageData<T>) {
-    let message: ClientMessage<T> = serde_json::from_str(&message.trim()).unwrap();
-    (message.header, message.data)
+/// Parses text to `ClientMessage`
+pub fn parse_message<T: DeserializeOwned + Serialize>(message: String) -> ClientMessage<T> {
+    info!("PARSING : {}", message);
+    serde_json::from_str::<ClientMessage<T>>(&message.trim()).unwrap()
+}
+
+pub fn get_header<'a>(s: String) -> String {
+    let message: Value = serde_json::from_str(&s).unwrap();
+    info!("PARSED : {:?}", message);
+    let header = &message["header"];
+    info!("PARSED : {:?}", header);
+    header.as_str().expect("Couldn't parse header").to_string()
 }

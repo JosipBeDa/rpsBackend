@@ -1,3 +1,4 @@
+//! Contains the message models
 use crate::models::user::ChatUser;
 use actix::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -13,7 +14,7 @@ pub struct Message(pub String);
 #[rtype(result = "()")]
 pub struct Connect {
     pub user: ChatUser,
-    pub address: Recipient<Message>
+    pub address: Recipient<Message>,
 }
 
 /// When the server
@@ -24,11 +25,7 @@ pub struct Disconnect {
     pub session_id: String,
 }
 
-/// The main message format ez_socket expects. When sending data messages (i.e. messages that
-/// don't have the 'chat' header), they will be sent to all connected sessions. These messages
-/// are usually associated with events like a user connecting and contain data associated with
-/// them (e.g. the id of the connecting user). When sending chat messages, the MessageData will contain
-/// the actual chat message which contains the details like the recepient and sender.
+/// The main message format ez_socket expects.
 #[derive(Message, Debug, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct ClientMessage<T: Serialize> {
@@ -38,7 +35,7 @@ pub struct ClientMessage<T: Serialize> {
     pub data: MessageData<T>,
 }
 /// Represents the type of message data.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum MessageData<T>
 where
@@ -46,8 +43,9 @@ where
 {
     String(String),
     List(Vec<T>),
+    User(ChatUser),
     ChatMessage(ChatMessage),
-    User(ChatUser)
+    Join(Join),
 }
 /// Shortcuts for serializing messages to JSON.
 impl<T> ToString for ClientMessage<T>
@@ -80,7 +78,7 @@ pub struct ChatMessage {
     pub content: String,
     /// Flag indicating whether the receiver has read the message. If it is a public message
     /// (i.e message sent to rooms with multiple receivers) this flag is omitted.
-    pub read: Option<bool>,
+    pub read: bool,
 }
 
 /// Lists available rooms
@@ -89,13 +87,17 @@ impl actix::Message for ListRooms {
     type Result = Vec<String>;
 }
 
-/// Join room, if room does not exists create new one.
-///
-/// `id`: the client session ID,
-/// `room_name`: the room name
-#[derive(Message)]
-#[rtype(result = "()")]
+/// Join room
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Join {
     pub id: String,
-    pub room_name: String,
+    pub room_id: String,
+}
+impl actix::Message for Join {
+    type Result = Vec<String>;
+}
+#[derive(Message, Debug, Serialize, Deserialize, Clone)]
+#[rtype(result = "()")]
+pub struct Read {
+    pub messages: Vec<ChatMessage>,
 }

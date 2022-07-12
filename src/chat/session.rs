@@ -1,3 +1,4 @@
+//! The session actor.
 use super::ez_handler;
 use super::models::{Connect, Disconnect, Message};
 use super::server::ChatServer;
@@ -14,13 +15,10 @@ const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 /// How long before lack of client response causes a timeout
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Session instance. Gets created each time a client connects.
+/// Session instance. Gets created each time a client connects and communicates
+/// with `ChatServer` through the `ez_handler`.
 /// 
-/// Every session instance can conceptually be thought of as the intermediary
-/// between the client and the server. The session actor receives messages
-/// from the client and relays them to the chat server actor for processing.
-/// 
-/// Depending on the type of send, the session actor can await the result of 
+/// Depending on the type of send, the session actor awaits the result of 
 /// the message with `send` or just blindly send it with `do_send` without awaiting.
 #[derive(Debug)]
 pub struct WsChatSession {
@@ -38,7 +36,7 @@ pub struct WsChatSession {
 }
 
 impl WsChatSession {
-    /// Sends ping to the client every `HEARTBEAT_INTERVAL` seconds
+    /// Sends a ping to the client every `HEARTBEAT_INTERVAL` seconds
     fn hb(&self, context: &mut ws::WebsocketContext<Self>) {
         context.run_interval(HEARTBEAT_INTERVAL, |actor, context| {
             // Check if the duration is greater than the timeout
@@ -62,8 +60,7 @@ impl WsChatSession {
 impl Actor for WsChatSession {
     type Context = ws::WebsocketContext<Self>;
 
-    /// Method is called on actor start.
-    /// We register the session with ChatServer
+    /// Called on actor start, sends a `Connect` message to the server.
     fn started(&mut self, context: &mut Self::Context) {
         // Start the heartbeat process on session start.
         self.hb(context);
@@ -80,6 +77,7 @@ impl Actor for WsChatSession {
         })
     }
 
+    /// Called on actor stop, sends a `Disconnect` message to the server.
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
         info!("{}{:?}", "ACTOR STOPPING -- ID : ".red(), self.id);
         self.address.do_send(Disconnect {

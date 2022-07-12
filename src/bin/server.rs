@@ -18,7 +18,7 @@ async fn main() -> std::io::Result<()> {
     //Used for logging
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
-    //Initialize the application state containing the reqwest client and DB pool
+    //Initialize the application state containing the reqwest client, DB pool and chat actor
     let state = Data::new(state::app::AppState::initialize());
     let config = Config::from_env().expect("Couldn't construct configuration");
     let session_secret = Key::generate();

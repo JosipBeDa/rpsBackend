@@ -1,61 +1,28 @@
 use crate::models::authentication::{AuthForm, AuthResponse};
+use crate::models::error::{AuthenticationError, GlobalError};
 use crate::models::user::User;
-use crate::services::cookie::*;
-use crate::services::jwt;
-use crate::state::app::AppState;
-use actix_web::{web, HttpResponseBuilder as Response, Responder};
-use reqwest::StatusCode;
+use crate::state::{app::AppState, db_pool};
+use actix_web::{web, HttpResponse};
+use colored::Colorize;
+use tracing::info;
 
-pub async fn handler(auth_form: web::Form<AuthForm>, state: web::Data<AppState>) -> impl Responder {
-    let db_connection = match state.db_pool.get() {
-        Ok(conn) => conn,
-        Err(_) => return Response::new(StatusCode::INTERNAL_SERVER_ERROR).finish(),
-    };
-    // Find user in db
-    match User::find_by_uname(&db_connection, &auth_form.username) {
-        // Compare passwords
-        Ok(Some(user)) => match bcrypt::verify(auth_form.password.clone(), &user.password) {
-            Ok(verified) => {
-                if !verified {
-                    // Bad password
-                    return Response::new(StatusCode::UNAUTHORIZED)
-                        .json(AuthResponse::fail("Invalid Credentials"));
-                }
-                let user = user.convert();
-                // Generate token and session ID
-                if let Ok((token, exp_in)) = jwt::generate_jwt(user.to_string()) {
-                    let cookie = create_cookie(&token);
-                    Response::new(StatusCode::OK)
-                        .cookie(cookie)
-                        .json(AuthResponse::succeed(user, "Success!"))
-                } else {
-                    // Failed to generate token
-                    Response::new(StatusCode::INTERNAL_SERVER_ERROR)
-                        .json(AuthResponse::fail("Internal Server Error"))
-                }
-            }
-            // Bcrypt error
-            Err(_) => Response::new(StatusCode::INTERNAL_SERVER_ERROR)
-                .json(AuthResponse::fail("Internal Server Error")),
-        },
-        // User not found
-        Ok(None) => Response::new(StatusCode::INTERNAL_SERVER_ERROR)
-            .json(AuthResponse::fail("User not found")),
-        // Diesel error
-        Err(_) => Response::new(StatusCode::INTERNAL_SERVER_ERROR)
-            .json(AuthResponse::fail("Internal Server Error")),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_login() {
-        let _ = User {
-            id: "1".to_string(),
-            username: "shiva".to_string(),
-            password: "shiva".to_string(),
-        };
+pub async fn handler(
+    auth_form: web::Form<AuthForm>,
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, GlobalError> {
+    info!("{}{:?}", "User login : ".cyan(), auth_form);
+    let db_connection = db_pool::connect(&state)?;
+    if let Some(user) = User::find_by_uname(&db_connection, &auth_form.username)? {
+        let verified = bcrypt::verify(auth_form.password.clone(), &user.password)?;
+        if !verified {
+            return Err(GlobalError::AuthenticationError(
+                AuthenticationError::BadPassword,
+            ));
+        }
+        AuthResponse::succeed_with_token(user)
+    } else {
+        Err(GlobalError::AuthenticationError(
+            AuthenticationError::UserNotFound,
+        ))
     }
 }
