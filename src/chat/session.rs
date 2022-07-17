@@ -1,14 +1,15 @@
 //! The session actor.
 use super::ez_handler;
 use super::models::{Connect, Disconnect, Message};
+use super::rps::RPSManager;
 use super::server::ChatServer;
 use crate::models::user::ChatUser;
 use actix::prelude::*;
 use actix_web_actors::ws;
 use colored::Colorize;
+use std::time::{Duration, Instant};
 use tracing::info;
 use tracing::log::warn;
-use std::time::{Duration, Instant};
 
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -17,8 +18,8 @@ const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Session instance. Gets created each time a client connects and communicates
 /// with `ChatServer` through the `ez_handler`.
-/// 
-/// Depending on the type of send, the session actor awaits the result of 
+///
+/// Depending on the type of send, the session actor awaits the result of
 /// the message with `send` or just blindly send it with `do_send` without awaiting.
 #[derive(Debug)]
 pub struct WsChatSession {
@@ -33,6 +34,8 @@ pub struct WsChatSession {
     pub heartbeat: Instant,
     /// The address of the chat server. Every session sends their messages to here for processing.
     pub address: Addr<ChatServer>,
+    /// The address of the RPS Manager
+    pub rps_address: Addr<RPSManager>,
 }
 
 impl WsChatSession {
@@ -67,14 +70,16 @@ impl Actor for WsChatSession {
         info!("{}{:?}", "ACTOR STARTED -- ID : ".green(), self.id);
 
         let address = context.address().recipient();
-        self.address.do_send(Connect {
+        let message = Connect {
             user: ChatUser {
                 id: self.id.clone(),
                 username: self.username.clone(),
                 connected: true,
             },
-            address
-        })
+            address,
+        };
+        self.address.do_send(message.clone());
+        self.rps_address.do_send(message);
     }
 
     /// Called on actor stop, sends a `Disconnect` message to the server.

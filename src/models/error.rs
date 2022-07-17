@@ -4,6 +4,8 @@ use serde::Serialize;
 use std::fmt::Display;
 use thiserror::Error;
 
+use crate::chat::rps::RPSError;
+
 /// The main wrapper for all the errors we can encounter
 #[derive(Debug, Error)]
 pub enum GlobalError {
@@ -23,6 +25,8 @@ pub enum GlobalError {
     R2D2Error,
     #[error("`{0}`")]
     AuthenticationError(AuthenticationError),
+    #[error("`{0}`")]
+    RPSError(RPSError)
 }
 
 impl GlobalError {
@@ -68,17 +72,16 @@ impl ResponseError for GlobalError {
         Response::new(status).json(error_response)
     }
 }
-impl Display for ErrorResponse {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "There was an error: {}", self)
-    }
-}
-
 #[derive(Serialize, Debug)]
 pub struct ErrorResponse {
     code: u16,
     error: String,
     message: String,
+}
+impl Display for ErrorResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "There was an error: {}", self)
+    }
 }
 
 #[derive(Debug, Error)]

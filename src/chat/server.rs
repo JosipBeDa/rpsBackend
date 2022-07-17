@@ -10,33 +10,6 @@ use std::collections::HashMap;
 use tracing::info;
 
 use super::models::{Join, Read};
-
-/// Shortcut for implementing the `actix::Handler` trait for any given struct that implements the
-/// `actix::Message` trait. Used when we have to access the contents of the message.
-#[macro_export]
-macro_rules! ez_register {
-    ($msg: ty,$func: ident, $ret: ty) => {
-        impl actix::Handler<$msg> for crate::chat::server::ChatServer {
-            type Result = $ret;
-            fn handle(&mut self, msg: $msg, _: &mut Context<Self>) -> Self::Result {
-                $func(msg)
-            }
-        }
-    };
-}
-/// Shortcut for implementing the `actix::Handler` trait for any given struct that implements the
-/// `actix::Message` trait. Used when we have don't need the message contents, cheaper because we don't
-/// create an extra function pointer.
-#[macro_export]
-macro_rules! ez_register_block {
-    ($msg: ty, $blck: block) => {
-        impl actix::Handler<$msg> for crate::chat::server::ChatServer {
-            type Result = ();
-            fn handle(&mut self, _: $msg, _: &mut Context<Self>) -> Self::Result $blck
-        }
-    };
-}
-
 /// `ChatServer` is an actor that manages chat rooms and is responsible for coordinating chat sessions.
 ///
 /// It is the actor responsible for keeping track of which session ID points to which
@@ -137,7 +110,6 @@ impl Handler<Connect> for ChatServer {
         );
 
         let id = msg.user.id.clone();
-
         self.sessions.insert(id.clone(), msg.address);
         self.rooms
             .entry(id.to_owned())
@@ -170,7 +142,7 @@ impl Handler<Connect> for ChatServer {
 }
 
 /// Message received when an actor gets dropped. Sets users' connected status to false.
-/// Sends a global message with the disconnecting user's ID and removes their session ID from all rooms.
+/// Sends a global message with the disconnecting user's ID and removes their room entry.
 impl Handler<Disconnect> for ChatServer {
     type Result = ();
 
@@ -212,7 +184,10 @@ impl<T: Serialize> Handler<ClientMessage<T>> for ChatServer {
             )
             .unwrap();
 
-            self.send_message(&msg.sender_id, message.clone());
+            // Send it only if it's not being sent to self
+            if msg.receiver_id != msg.sender_id {
+                self.send_message(&msg.sender_id, message.clone());
+            }
             self.send_data(&&msg.sender_id, message);
         }
     }
@@ -226,7 +201,6 @@ impl Handler<Join> for ChatServer {
         info!("{}{}{}{}", "JOINING : ".cyan(), id, " => ".cyan(), room_id);
 
         self.rooms.remove(&id);
-
         self.rooms
             .entry(id.clone())
             .or_insert_with(|| room_id.clone());
@@ -248,7 +222,7 @@ impl Handler<Join> for ChatServer {
             }
         }
 
-        // Don't send to self
+        // Messages sent to self are automatically read
         if id != room_id && read.len() > 0 {
             self.send_message(
                 &id,

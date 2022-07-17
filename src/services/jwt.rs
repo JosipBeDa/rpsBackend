@@ -32,7 +32,7 @@ pub fn generate_jwt(serialized_user: String) -> Result<String, GlobalError> {
         "{}{}{}{}",
         "Creating JWT -- Now: ".cyan(),
         now,
-        " Exp: ",
+        " Exp: ".cyan(),
         exp_timestamp
     );
     let claims = Claims::new(serialized_user, now, exp_timestamp);

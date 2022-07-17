@@ -1,7 +1,8 @@
-//! Every text message the `WsChatSession` stream handler receiver is sent to this
+//! Every text message the `WsChatSession` stream handler receives is sent to this
 //! handler for processing.
 use super::models::{ChatMessage, ClientMessage, Join, MessageData, Read};
 use super::session::WsChatSession;
+use crate::chat::rps::{RPSMessage, RPS};
 use crate::models::error::GlobalError;
 use actix::prelude::*;
 use actix_web_actors::ws::WebsocketContext;
@@ -29,7 +30,6 @@ pub fn handle<T>(
                     header: message.header.clone(),
                     data: MessageData::ChatMessage(chat_message),
                 };
-                // Send the message to the server
                 session.address.do_send(client_message);
             }
         }
@@ -53,7 +53,7 @@ pub fn handle<T>(
                                     );
                                 }
                             }
-                            Err(_) => warn!("SOMETHING WENT WRONG"),
+                            Err(e) => warn!("SOMETHING WENT WRONG : {:?}", e),
                         }
                         fut::ready(())
                     })
@@ -66,8 +66,29 @@ pub fn handle<T>(
                 session.address.do_send(Read { messages })
             }
         }
-        "lol" => {
-            context.text(generate_message::<String>("lel", MessageData::String(String::from("lel"))).unwrap())
+        "lol" => context.text(
+            generate_message::<String>("lel", MessageData::String(String::from("lel"))).unwrap(),
+        ),
+        "rps" => {
+            let message = parse_message::<RPSMessage>(text);
+            info!("{}{:?}", "GOT RPS MESSAGE : ".purple(), message);
+            if let MessageData::RPS(msg) = message.data {
+                session
+                    .rps_address
+                    .send(msg)
+                    .into_actor(session)
+                    .then(|res, _, ctx| {
+                        match res {
+                            Ok(rps_game) => ctx.text(
+                                generate_message::<RPS>("rps", MessageData::RPSState(rps_game))
+                                    .unwrap(),
+                            ),
+                            Err(e) => warn!("SOMETHING WENT WRONG : {:?}", e),
+                        }
+                        fut::ready(())
+                    })
+                    .wait(context)
+            }
         }
         _ => warn!("Bad message"),
     }
@@ -87,14 +108,12 @@ where
 
 /// Parses text to `ClientMessage`
 pub fn parse_message<T: DeserializeOwned + Serialize>(message: String) -> ClientMessage<T> {
-    info!("PARSING : {}", message);
+    info!("GOT MESSAGE PARSING : {}", message);
     serde_json::from_str::<ClientMessage<T>>(&message.trim()).unwrap()
 }
 
 pub fn get_header<'a>(s: String) -> String {
     let message: Value = serde_json::from_str(&s).unwrap();
-    info!("PARSED : {:?}", message);
     let header = &message["header"];
-    info!("PARSED : {:?}", header);
     header.as_str().expect("Couldn't parse header").to_string()
 }

@@ -1,7 +1,7 @@
+use crate::chat::*;
 use crate::models::error::{AuthenticationError, GlobalError};
 use crate::services::jwt;
 use crate::state::app::AppState;
-use crate::chat::*;
 use actix_web::{web, HttpRequest, Responder};
 use actix_web_actors::ws;
 use core::pin::Pin;
@@ -22,6 +22,7 @@ pub async fn handler(
                 room: chat_user.id,
                 heartbeat: Instant::now(),
                 address: Pin::new(&state.chat_server).get_ref().clone(),
+                rps_address: Pin::new(&state.rps_manager).get_ref().clone(),
             },
             &req,
             stream,
