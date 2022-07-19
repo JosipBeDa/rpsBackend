@@ -2,7 +2,7 @@
 //! handler for processing.
 use super::models::{ChatMessage, ClientMessage, Join, MessageData, Read};
 use super::session::WsChatSession;
-use crate::chat::rps::{RPSMessage, RPS};
+use crate::rps::{models::RPSData, game::RPS};
 use crate::models::error::GlobalError;
 use actix::prelude::*;
 use actix_web_actors::ws::WebsocketContext;
@@ -70,7 +70,7 @@ pub fn handle<T>(
             generate_message::<String>("lel", MessageData::String(String::from("lel"))).unwrap(),
         ),
         "rps" => {
-            let message = parse_message::<RPSMessage>(text);
+            let message = parse_message::<RPSData>(text);
             info!("{}{:?}", "GOT RPS MESSAGE : ".purple(), message);
             if let MessageData::RPS(msg) = message.data {
                 session
@@ -79,10 +79,15 @@ pub fn handle<T>(
                     .into_actor(session)
                     .then(|res, _, ctx| {
                         match res {
-                            Ok(rps_game) => ctx.text(
-                                generate_message::<RPS>("rps", MessageData::RPSState(rps_game))
-                                    .unwrap(),
-                            ),
+                            Ok(rps_data) => match rps_data {
+                                RPSData::None => {}
+                                _ => {
+                                    ctx.text(
+                                        generate_message::<RPS>("rps", MessageData::RPS(rps_data))
+                                            .unwrap(),
+                                    );
+                                }
+                            },
                             Err(e) => warn!("SOMETHING WENT WRONG : {:?}", e),
                         }
                         fut::ready(())

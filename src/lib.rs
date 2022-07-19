@@ -15,5 +15,6 @@ pub mod routes;
 pub mod schema;
 pub mod services;
 pub mod state;
+pub mod rps;
 
 pub const TOKEN_DURATION: cookie::time::Duration = cookie::time::Duration::hours(3);

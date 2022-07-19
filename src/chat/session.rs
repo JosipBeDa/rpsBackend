@@ -1,7 +1,7 @@
 //! The session actor.
 use super::ez_handler;
 use super::models::{Connect, Disconnect, Message};
-use super::rps::RPSManager;
+use crate::rps::manager::RPSManager;
 use super::server::ChatServer;
 use crate::models::user::ChatUser;
 use actix::prelude::*;

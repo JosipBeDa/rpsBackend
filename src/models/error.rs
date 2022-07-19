@@ -4,7 +4,7 @@ use serde::Serialize;
 use std::fmt::Display;
 use thiserror::Error;
 
-use crate::chat::rps::RPSError;
+use crate::rps::models::RPSError;
 
 /// The main wrapper for all the errors we can encounter
 #[derive(Debug, Error)]

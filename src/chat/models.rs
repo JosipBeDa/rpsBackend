@@ -3,7 +3,7 @@ use crate::models::user::ChatUser;
 use actix::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::rps::{RPSMessage, RPS};
+use crate::rps::models::RPSData;
 
 /// Chat server sends these messages to session
 #[derive(Message)]
@@ -49,8 +49,7 @@ where
     User(ChatUser),
     ChatMessage(ChatMessage),
     Join(Join),
-    RPS(RPSMessage),
-    RPSState(RPS)
+    RPS(RPSData),
 }
 
 /// Shortcuts for serializing messages to JSON.

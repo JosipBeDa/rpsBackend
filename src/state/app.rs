@@ -1,4 +1,4 @@
-use crate::chat::rps::RPSManager;
+use crate::rps::manager::RPSManager;
 use crate::chat::server::ChatServer;
 use crate::state::client;
 use crate::state::db_pool;
