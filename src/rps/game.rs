@@ -1,23 +1,9 @@
-use crate::chat::models::Message;
-use crate::rps::models::Event;
-use crate::rps::models::RPSData;
-use crate::rps::models::Update;
 use actix::prelude::*;
-use actix::Actor;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::fmt::Display;
 use tracing::{info, warn};
-use uuid::Uuid;
-
-use crate::models::error::GlobalError;
-
-use crate::chat::ez_handler;
-use crate::chat::models::{Connect, MessageData};
-
-use super::models::RPSAction;
 
 /// RPS game instance.
 #[derive(MessageResponse, Debug, Serialize, Deserialize, Clone)]

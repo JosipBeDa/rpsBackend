@@ -2,8 +2,8 @@
 use crate::models::user::ChatUser;
 use actix::prelude::*;
 use serde::{Deserialize, Serialize};
-
 use crate::rps::models::RPSData;
+use super::room::PublicRoom;
 
 /// Chat server sends these messages to session
 #[derive(Message)]
@@ -50,6 +50,7 @@ where
     ChatMessage(ChatMessage),
     Join(Join),
     RPS(RPSData),
+    Room(PublicRoom)
 }
 
 /// Shortcuts for serializing messages to JSON.
@@ -92,14 +93,23 @@ pub struct Join {
     pub id: String,
     pub room_id: String,
 }
-/// Returns a vec of read message IDs where `id` was the receiver and
-/// `room_id` was the sender.
+/// Returns a vec of message IDs where `id` is the receiver and
+/// `room_id` is the sender.
 impl actix::Message for Join {
-    type Result = Vec<String>;
+    type Result = Vec<ChatMessage>;
 }
 /// Contains a vec of read messages.
 #[derive(Message, Debug, Serialize, Deserialize, Clone)]
 #[rtype(result = "()")]
 pub struct Read {
     pub messages: Vec<ChatMessage>,
+}
+
+/// Creates a public chat room
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Room {
+    pub sender_id: String,
+}
+impl actix::Message for Room {
+    type Result = PublicRoom;
 }

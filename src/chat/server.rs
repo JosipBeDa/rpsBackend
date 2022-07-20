@@ -1,44 +1,51 @@
 //! `ChatServer` actor. It maintains a list of connected client sessions
 //! and with whom the sessions are communicating.
+use super::models::messages::{
+    ChatMessage, ClientMessage, Connect, Disconnect, Join, Message, MessageData, Read, Room,
+};
+use super::models::room::PublicRoom;
 use crate::chat::ez_handler;
-use crate::chat::models::{ChatMessage, ClientMessage, Connect, Disconnect, Message, MessageData};
 use crate::models::user::ChatUser;
+use crate::state::db_pool;
 use actix::prelude::*;
 use colored::Colorize;
 use serde::Serialize;
 use std::collections::HashMap;
 use tracing::info;
-
-use super::models::{Join, Read};
 /// `ChatServer` is an actor that manages chat rooms and is responsible for coordinating chat sessions.
 ///
 /// It is the actor responsible for keeping track of which session ID points to which
 /// actor address (`sessions`) and which sessions are communicating with one another (`rooms`).
 /// It also keeps track of currently connected users and processes messages from other actors.
-#[derive(Debug)]
+//#[derive(Debug)]
 pub struct ChatServer {
     /// Sessions map a session ID with its actor address
     sessions: HashMap<String, Recipient<Message>>,
     /// Maps session IDs to other session IDs
-    rooms: HashMap<String, String>,
+    private_rooms: HashMap<String, String>,
+    public_rooms: HashMap<String, PublicRoom>,
     /// Messages
     messages: Vec<ChatMessage>,
     /// The total connected users
     users: HashMap<String, ChatUser>,
+    /// The database connection
+    db_pool: db_pool::PgPool,
 }
 
 impl ChatServer {
-    pub fn new() -> ChatServer {
+    pub fn new(db_pool: db_pool::PgPool) -> ChatServer {
         ChatServer {
             sessions: HashMap::new(),
-            rooms: HashMap::new(),
+            private_rooms: HashMap::new(),
+            public_rooms: HashMap::new(),
             users: HashMap::new(),
             messages: vec![],
+            db_pool,
         }
     }
-    /// Send a message to a specific room. The `sender` is used to fetch all IDs
+    /// Send a message to a specific room. The `sender` is used to fetch all IDs it's pointing to
     fn send_message(&self, sender: &str, message: String) {
-        if let Some(id) = self.rooms.get(sender) {
+        if let Some(id) = self.private_rooms.get(sender) {
             info!(
                 "{}{:?}{}{:?}",
                 "SENDING MESSAGE : ".blue(),
@@ -59,19 +66,30 @@ impl ChatServer {
         }
     }
     /// Send message to all actors
-    fn send_global(&self, message: String) {
+    fn broadcast(&self, message: String) {
         info!("{}{:?}", "SENDING GLOBAL : ".blue(), message);
         for address in self.sessions.values() {
             address.do_send(Message(message.clone()));
         }
     }
 
-    /// Clean empty rooms
+    /// Gets all messages sent to and received from the given user
+    fn get_private_messages(&self, user_id: &str) -> Vec<ChatMessage> {
+        let mut messages = vec![];
+        for message in &self.messages {
+            if message.sender_id == user_id || message.receiver_id == user_id {
+                messages.push(message.clone());
+            }
+        }
+        messages
+    }
+
+    /// Clean empty private_rooms
     fn clean_rooms(&mut self) {
-        for room in self.rooms.clone().into_keys() {
-            if let Some(sessions) = self.rooms.get(&room) {
+        for room in self.private_rooms.clone().into_keys() {
+            if let Some(sessions) = self.private_rooms.get(&room) {
                 if sessions.is_empty() {
-                    self.rooms.remove(&room);
+                    self.private_rooms.remove(&room);
                 }
             }
         }
@@ -101,7 +119,7 @@ impl Handler<Connect> for ChatServer {
         }
 
         // Notify all users
-        self.send_global(
+        self.broadcast(
             ez_handler::generate_message::<ChatUser>(
                 "user_connected",
                 MessageData::User(msg.user.clone()),
@@ -109,9 +127,10 @@ impl Handler<Connect> for ChatServer {
             .unwrap(),
         );
 
+        // Insert into session
         let id = msg.user.id.clone();
         self.sessions.insert(id.clone(), msg.address);
-        self.rooms
+        self.private_rooms
             .entry(id.to_owned())
             .or_insert_with(|| id.clone());
 
@@ -135,8 +154,11 @@ impl Handler<Connect> for ChatServer {
         // Send all messages to self
         self.send_data(
             &id,
-            ez_handler::generate_message("messages", MessageData::List(self.messages.clone()))
-                .unwrap(),
+            ez_handler::generate_message(
+                "messages",
+                MessageData::List(self.get_private_messages(&id)),
+            )
+            .unwrap(),
         );
     }
 }
@@ -150,14 +172,14 @@ impl Handler<Disconnect> for ChatServer {
         info!("{}{:?}", "USER DISCONNECTED : ".red(), msg);
 
         if self.sessions.remove(&msg.session_id).is_some() {
-            self.rooms.remove(&msg.session_id);
+            self.private_rooms.remove(&msg.session_id);
         }
 
         if let Some(user) = self.users.get_mut(&msg.session_id) {
             user.connected = false;
         }
 
-        self.send_global(
+        self.broadcast(
             ez_handler::generate_message::<String>(
                 "user_disconnected",
                 MessageData::String(msg.session_id.clone()),
@@ -194,42 +216,43 @@ impl<T: Serialize> Handler<ClientMessage<T>> for ChatServer {
 }
 
 impl Handler<Join> for ChatServer {
-    type Result = Vec<String>;
+    type Result = Vec<ChatMessage>;
 
     fn handle(&mut self, message: Join, _: &mut Context<Self>) -> Self::Result {
         let Join { id, room_id } = message;
         info!("{}{}{}{}", "JOINING : ".cyan(), id, " => ".cyan(), room_id);
 
-        self.rooms.remove(&id);
-        self.rooms
+        // If joining a public room simply return its messages
+        if let Some(public_room) = self.public_rooms.get_mut(&room_id) {
+            public_room.set_user(&id);
+            return public_room.get_messages();
+        }
+
+        // Set the sender to point to the receiver
+        self.private_rooms.remove(&id);
+        self.private_rooms
             .entry(id.clone())
             .or_insert_with(|| room_id.clone());
 
-        info!(
-            "{}{:?}{}{:?}",
-            "ROOMS : ".cyan(),
-            self.rooms,
-            " SESSIONS ".cyan(),
-            self.sessions.keys()
-        );
-
-        let mut read = vec![];
-
+        // Get all associated messages
+        let mut messages = vec![];
         for msg in &mut self.messages {
             if msg.receiver_id == id && msg.sender_id == room_id && msg.read == false {
-                msg.read = true;
-                read.push(msg.id.clone());
+                if msg.read == false {
+                    msg.read = true;
+                }
+                messages.push(msg.clone());
             }
         }
 
         // Messages sent to self are automatically read
-        if id != room_id && read.len() > 0 {
+        if id != room_id && messages.len() > 0 {
             self.send_message(
                 &id,
-                ez_handler::generate_message("read", MessageData::List(read.clone())).unwrap(),
+                ez_handler::generate_message("read", MessageData::List(messages.clone())).unwrap(),
             );
         }
-        read
+        messages
     }
 }
 
@@ -252,5 +275,15 @@ impl Handler<Read> for ChatServer {
             sender.as_ref(),
             ez_handler::generate_message("read", MessageData::List(message.messages)).unwrap(),
         );
+    }
+}
+
+impl Handler<Room> for ChatServer {
+    type Result = PublicRoom;
+    fn handle(&mut self, message: Room, _: &mut Context<Self>) -> Self::Result {
+        info!("{}{:?}", "CREATING ROOM WITH : ".cyan(), message.sender_id);
+        let room = PublicRoom::new_insert(&message.sender_id);
+        self.broadcast(ez_handler::generate_message::<Room>("room", MessageData::Room(room.clone())).unwrap());
+        room
     }
 }

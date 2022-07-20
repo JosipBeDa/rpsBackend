@@ -2,11 +2,8 @@ use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use dotenv::dotenv;
 use std::env;
-
 use crate::models::error::GlobalError;
-
 use super::app::AppState;
-
 pub type PgPool = Pool<ConnectionManager<PgConnection>>;
 
 // Create connection pool for global application use

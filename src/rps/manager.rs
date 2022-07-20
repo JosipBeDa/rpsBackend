@@ -1,7 +1,5 @@
 use crate::chat::ez_handler;
-use crate::chat::models::Connect;
-use crate::chat::models::Message;
-use crate::chat::models::MessageData;
+use crate::chat::models::messages::{Connect, Message, MessageData};
 use crate::rps::models::Event;
 use crate::rps::models::RPSData;
 use crate::rps::models::Update;
@@ -144,6 +142,19 @@ impl Handler<RPSData> for RPSManager {
                         if let Some(winners) = game.choose_rps(rps, msg.sender_id.clone()) {
                             for (id, address) in &self.sessions {
                                 if game.connections.contains(id) {
+                                    // Send the choices so client can show them to everyone
+                                    address.do_send(Message(
+                                        ez_handler::generate_message::<RPS>(
+                                            "rps",
+                                            MessageData::RPS(RPSData::Update(Update {
+                                                game_id: game.id.clone(),
+                                                event: Event::Choices(
+                                                    game.choices.clone().drain().collect(),
+                                                ),
+                                            })),
+                                        )
+                                        .unwrap(),
+                                    ));
                                     // Send winners
                                     address.do_send(Message(
                                         ez_handler::generate_message::<RPS>(
@@ -159,24 +170,6 @@ impl Handler<RPSData> for RPSManager {
                             }
                             game.reset_choices();
                             return RPSData::None;
-                        }
-                        // Otherwise send update
-                        for (id, address) in &self.sessions {
-                            if game.connections.contains(id) {
-                                address.do_send(Message(
-                                    ez_handler::generate_message::<RPS>(
-                                        "rps",
-                                        MessageData::RPS(RPSData::Update(Update {
-                                            game_id: game.id.clone(),
-                                            event: Event::PlayerChoice((
-                                                msg.sender_id.clone(),
-                                                rps.clone(),
-                                            )),
-                                        })),
-                                    )
-                                    .unwrap(),
-                                ));
-                            }
                         }
                         RPSData::None
                     }

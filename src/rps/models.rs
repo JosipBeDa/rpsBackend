@@ -1,7 +1,7 @@
+use super::game::RPS;
 use actix::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
-use super::game::RPS;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RPSError {
@@ -36,7 +36,7 @@ pub struct Update {
 pub enum Event {
     PlayerConnected(String),
     FastToggled(bool),
-    PlayerChoice((String, char)),
+    Choices(Vec<(String, char)>),
     Winners(Vec<String>),
 }
 

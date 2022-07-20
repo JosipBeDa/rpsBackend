@@ -1,7 +1,6 @@
 use crate::rps::manager::RPSManager;
 use crate::chat::server::ChatServer;
-use crate::state::client;
-use crate::state::db_pool;
+use super::{client, db_pool};
 use actix::{Actor, Addr};
 
 #[derive(Clone)]
@@ -16,7 +15,7 @@ impl AppState {
     pub fn initialize() -> Self {
         let db_pool = db_pool::establish_pool_connection();
         let client = client::initialize();
-        let chat_server = ChatServer::new().start();
+        let chat_server = ChatServer::new(db_pool.clone()).start();
         let rps_manager = RPSManager::new().start();
         AppState {
             client,

@@ -1,6 +1,6 @@
 //! Every text message the `WsChatSession` stream handler receives is sent to this
 //! handler for processing.
-use super::models::{ChatMessage, ClientMessage, Join, MessageData, Read};
+use super::models::messages::{ChatMessage, ClientMessage, Join, MessageData, Read};
 use super::session::WsChatSession;
 use crate::rps::{models::RPSData, game::RPS};
 use crate::models::error::GlobalError;
@@ -48,7 +48,7 @@ pub fn handle<T>(
                             Ok(messages) => {
                                 if messages.len() > 0 {
                                     ctx.text(
-                                        generate_message("read", MessageData::List(messages))
+                                        generate_message("messages", MessageData::List(messages))
                                             .unwrap(),
                                     );
                                 }
@@ -60,6 +60,7 @@ pub fn handle<T>(
                     .wait(context)
             }
         }
+        // Obligatory sanity lol
         "read" => {
             let message = parse_message::<ChatMessage>(text);
             if let MessageData::List::<ChatMessage>(messages) = message.data {
