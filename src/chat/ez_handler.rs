@@ -2,8 +2,9 @@
 //! handler for processing.
 use super::models::messages::{ChatMessage, ClientMessage, Join, MessageData, Read};
 use super::session::WsChatSession;
-use crate::rps::{models::RPSData, game::RPS};
+use crate::chat::models::messages::CreateRoom;
 use crate::models::error::GlobalError;
+use crate::rps::{game::RPS, models::RPSData};
 use actix::prelude::*;
 use actix_web_actors::ws::WebsocketContext;
 use colored::Colorize;
@@ -60,16 +61,18 @@ pub fn handle<T>(
                     .wait(context)
             }
         }
-        // Obligatory sanity lol
         "read" => {
             let message = parse_message::<ChatMessage>(text);
             if let MessageData::List::<ChatMessage>(messages) = message.data {
                 session.address.do_send(Read { messages })
             }
         }
-        "lol" => context.text(
-            generate_message::<String>("lel", MessageData::String(String::from("lel"))).unwrap(),
-        ),
+        "room" => {
+            let message = parse_message::<CreateRoom>(text);
+            if let MessageData::CreateRoom(sender_id) = message.data {
+               session.address.do_send(CreateRoom { sender_id })
+            }
+        }
         "rps" => {
             let message = parse_message::<RPSData>(text);
             info!("{}{:?}", "GOT RPS MESSAGE : ".purple(), message);
@@ -96,6 +99,10 @@ pub fn handle<T>(
                     .wait(context)
             }
         }
+        // Obligatory sanity lol
+        "lol" => context.text(
+            generate_message::<String>("lel", MessageData::String(String::from("lel"))).unwrap(),
+        ),
         _ => warn!("Bad message"),
     }
 }

@@ -1,7 +1,7 @@
 //! `ChatServer` actor. It maintains a list of connected client sessions
 //! and with whom the sessions are communicating.
 use super::models::messages::{
-    ChatMessage, ClientMessage, Connect, Disconnect, Join, Message, MessageData, Read, Room,
+    ChatMessage, ClientMessage, Connect, Disconnect, Join, Message, MessageData, Read, CreateRoom,
 };
 use super::models::room::PublicRoom;
 use crate::chat::ez_handler;
@@ -278,12 +278,13 @@ impl Handler<Read> for ChatServer {
     }
 }
 
-impl Handler<Room> for ChatServer {
-    type Result = PublicRoom;
-    fn handle(&mut self, message: Room, _: &mut Context<Self>) -> Self::Result {
+impl Handler<CreateRoom> for ChatServer {
+    type Result = ();
+    fn handle(&mut self, message: CreateRoom, _: &mut Context<Self>) -> Self::Result {
         info!("{}{:?}", "CREATING ROOM WITH : ".cyan(), message.sender_id);
+        let id = uuid::Uuid::new_v4().to_string();
         let room = PublicRoom::new_insert(&message.sender_id);
-        self.broadcast(ez_handler::generate_message::<Room>("room", MessageData::Room(room.clone())).unwrap());
-        room
+        self.public_rooms.insert(id.clone(), room.clone());
+        self.broadcast(ez_handler::generate_message::<CreateRoom>("room", MessageData::Room((id, room))).unwrap());
     }
 }

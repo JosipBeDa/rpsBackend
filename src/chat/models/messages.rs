@@ -50,7 +50,8 @@ where
     ChatMessage(ChatMessage),
     Join(Join),
     RPS(RPSData),
-    Room(PublicRoom)
+    Room((String, PublicRoom)),
+    CreateRoom(String)
 }
 
 /// Shortcuts for serializing messages to JSON.
@@ -106,10 +107,8 @@ pub struct Read {
 }
 
 /// Creates a public chat room
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Room {
+#[derive(Message, Debug, Serialize, Deserialize, Clone)]
+#[rtype(result = "()")]
+pub struct CreateRoom {
     pub sender_id: String,
-}
-impl actix::Message for Room {
-    type Result = PublicRoom;
 }
