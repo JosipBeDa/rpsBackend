@@ -1,14 +1,23 @@
 use actix::prelude::*;
 use colored::Colorize;
+use rand;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use tracing::{info, warn};
+const EPIC_WORDS: &[&str] = &[
+    "Deadly Dispute",
+    "Supreme Battle",
+    "Ultimate Showdown",
+    "Quest for Glory",
+];
 
 /// RPS game instance.
 #[derive(MessageResponse, Debug, Serialize, Deserialize, Clone)]
 pub struct RPS {
     pub id: String,
+    pub name: String,
     pub host: String,
     pub player_ids: HashSet<String>,
     pub choices: HashMap<String, char>,
@@ -21,6 +30,7 @@ pub struct RPS {
 
 impl RPS {
     pub fn new(players: Vec<String>, host: String, game_id: String) -> Self {
+        let name = generate_epic_word();
         let mut player_ids = HashSet::new();
         let mut scores = HashMap::new();
         let mut connections = HashSet::new();
@@ -32,6 +42,7 @@ impl RPS {
         connections.insert(host.clone());
         Self {
             id: game_id,
+            name,
             host,
             player_ids,
             scores,
@@ -43,8 +54,8 @@ impl RPS {
         }
     }
 
-    pub fn toggle_fast(&mut self) {
-        self.fast_mode = !self.fast_mode;
+    pub fn toggle_fast(&mut self, flag: bool) {
+        self.fast_mode = flag;
     }
 
     pub fn choose_rps(&mut self, rps: char, player_id: String) -> Option<Vec<String>> {
@@ -125,7 +136,7 @@ impl RPS {
         }
         info!("WINNERS : {:?}", winners);
         // Nobody wins if it's a small game and it's a draw
-        if winners.len() > 1 && self.player_ids.len() < 3 {
+        if winners.len() > 1 && self.player_ids.len() <= 3 {
             return vec![];
         }
         for winner in winners.clone() {
@@ -138,7 +149,7 @@ impl RPS {
         self.choices.clear();
     }
 
-    pub fn disconnect_player(&mut self, player_id: &str) {
+    fn disconnect_player(&mut self, player_id: &str) {
         self.choices.remove(player_id);
         self.connections.remove(player_id);
     }
@@ -146,4 +157,10 @@ impl RPS {
     fn _end(&mut self) {
         self.game_over = true;
     }
+}
+
+fn generate_epic_word() -> String {
+    let mut rng = rand::thread_rng();
+    let idx = rng.gen_range(0..EPIC_WORDS.len());
+    EPIC_WORDS[idx].to_string()
 }

@@ -12,7 +12,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use tracing::log::{info, warn};
 
-/// Parses the text message to a `ClientMessage` struct and send the appropriate message to
+/// Parses the text message to a `ClientMessage` struct and sends the appropriate message to
 /// the server.
 pub fn handle<T>(
     text: String,
@@ -47,12 +47,11 @@ pub fn handle<T>(
                     .then(|res, _, ctx| {
                         match res {
                             Ok(messages) => {
-                                if messages.len() > 0 {
-                                    ctx.text(
-                                        generate_message("messages", MessageData::List(messages))
-                                            .unwrap(),
-                                    );
-                                }
+                                info!("SENDING MESSAGES EZ : {:?}", messages);
+                                ctx.text(
+                                    generate_message("messages", MessageData::List(messages))
+                                        .unwrap(),
+                                );
                             }
                             Err(e) => warn!("SOMETHING WENT WRONG : {:?}", e),
                         }
@@ -69,8 +68,8 @@ pub fn handle<T>(
         }
         "room" => {
             let message = parse_message::<CreateRoom>(text);
-            if let MessageData::CreateRoom(sender_id) = message.data {
-               session.address.do_send(CreateRoom { sender_id })
+            if let MessageData::CreateRoom(CreateRoom { sender_id, name }) = message.data {
+                session.address.do_send(CreateRoom { sender_id, name })
             }
         }
         "rps" => {

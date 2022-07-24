@@ -8,8 +8,7 @@ use actix::prelude::*;
 use actix_web_actors::ws;
 use colored::Colorize;
 use std::time::{Duration, Instant};
-use tracing::info;
-use tracing::log::warn;
+use tracing::{warn, info};
 
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);

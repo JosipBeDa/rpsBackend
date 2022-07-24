@@ -1,9 +1,9 @@
 //! Contains the message models
+use super::room::{PublicRoom, RoomData};
 use crate::models::user::ChatUser;
+use crate::rps::models::RPSData;
 use actix::prelude::*;
 use serde::{Deserialize, Serialize};
-use crate::rps::models::RPSData;
-use super::room::PublicRoom;
 
 /// Chat server sends these messages to session
 #[derive(Message)]
@@ -49,9 +49,11 @@ where
     User(ChatUser),
     ChatMessage(ChatMessage),
     Join(Join),
+    /// Contains all data related to RPS games.
     RPS(RPSData),
-    Room((String, PublicRoom)),
-    CreateRoom(String)
+    /// Contains all data related to rooms.
+    Room(RoomData),
+    CreateRoom(CreateRoom),
 }
 
 /// Shortcuts for serializing messages to JSON.
@@ -111,4 +113,5 @@ pub struct Read {
 #[rtype(result = "()")]
 pub struct CreateRoom {
     pub sender_id: String,
+    pub name: String,
 }

@@ -9,6 +9,7 @@ use colored::Colorize;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use tracing::info;
+use tracing::log::warn;
 use uuid::Uuid;
 
 use super::game::RPS;
@@ -30,6 +31,7 @@ impl RPSManager {
         }
     }
 
+    /// Register a new RPS game with the given players and the given player id as the host
     pub fn register_game(&mut self, players: Vec<String>, host: String) -> RPS {
         let id = Uuid::new_v4().to_string();
         self.games
@@ -41,6 +43,19 @@ impl RPSManager {
         game
     }
 
+    /// Returns all registered games
+    fn get_games(&self) -> Vec<RPS> {
+        self.games.values().cloned().collect()
+    }
+
+    /// Directly send a message to the address of the given session ID.
+    fn send_direct(&self, receiver: &str, message: String) {
+        if let Some(address) = self.sessions.get(receiver) {
+            let _ = address.do_send(Message(message.clone()));
+        }
+    }
+
+    /// Broadcasts a message to all sessions connected to the RPS manager.
     pub fn broadcast(&self, rps: RPS) {
         info!("BROADCASTING TO : {:?}", self.sessions.keys());
         for (_, address) in &self.sessions {
@@ -65,8 +80,16 @@ impl Actor for RPSManager {
 impl Handler<Connect> for RPSManager {
     type Result = ();
     fn handle(&mut self, msg: Connect, _: &mut Self::Context) -> Self::Result {
-        self.sessions.insert(msg.user.id, msg.address);
-        info!("INSERTED SESSION -- {:?}", self.sessions);
+        self.sessions.insert(msg.user.id.clone(), msg.address);
+        // Send all active games to the user
+        self.send_direct(
+            &msg.user.id,
+            ez_handler::generate_message::<RPS>(
+                "rps",
+                MessageData::RPS(RPSData::Rooms(self.get_games())),
+            )
+            .unwrap(),
+        )
     }
 }
 
@@ -82,13 +105,6 @@ impl Handler<RPSData> for RPSManager {
                         if game.player_ids.contains(&msg.sender_id)
                             && !game.connections.contains(&msg.sender_id)
                         {
-                            info!(
-                                "{}{}{}{}",
-                                "Player: ".purple(),
-                                msg.sender_id,
-                                " joined ".purple(),
-                                msg.game_id
-                            );
                             // Send update to all connected players
                             game.connections.insert(msg.sender_id.clone());
                             for (id, address) in &self.sessions {
@@ -112,7 +128,7 @@ impl Handler<RPSData> for RPSManager {
                     }
                     RPSAction::FastMode(flag) => {
                         if msg.sender_id == game.host {
-                            game.fast_mode = flag;
+                            game.toggle_fast(flag);
                         }
                         for (id, address) in &self.sessions {
                             if game.connections.contains(id) {
@@ -177,9 +193,10 @@ impl Handler<RPSData> for RPSManager {
                     RPSAction::Reset => todo!(),
                 }
             }
-            RPSData::State(_) => todo!(),
-            RPSData::Update(_) => todo!(),
-            RPSData::None => todo!(),
+            _ => {
+                warn!("RPS BAD MESSAGE!");
+                RPSData::None
+            }
         }
     }
 }

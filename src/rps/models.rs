@@ -20,6 +20,7 @@ pub enum RPSData {
     Action(Action),
     State(RPS),
     Update(Update),
+    Rooms(Vec<RPS>),
     None,
 }
 impl actix::Message for RPSData {
