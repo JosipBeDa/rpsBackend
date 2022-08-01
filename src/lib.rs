@@ -6,7 +6,6 @@ extern crate jsonwebtoken;
 extern crate tracing;
 
 pub mod application;
-pub mod chat;
 pub mod config;
 pub mod crypto;
 pub mod middleware;
@@ -15,6 +14,6 @@ pub mod routes;
 pub mod schema;
 pub mod services;
 pub mod state;
-pub mod rps;
+pub mod actors;
 
 pub const TOKEN_DURATION: cookie::time::Duration = cookie::time::Duration::hours(3);

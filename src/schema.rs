@@ -1,11 +1,27 @@
 table! {
-    messages (id) {
+    hall_of_fame (id) {
         id -> Int4,
+        user_id -> Varchar,
+        score -> Int4,
+    }
+}
+
+table! {
+    messages (id) {
+        id -> Varchar,
         sender_id -> Varchar,
-        rec_user -> Nullable<Varchar>,
-        rec_room -> Nullable<Varchar>,
-        body -> Nullable<Varchar>,
-        time_sent -> Nullable<Timestamptz>,
+        receiver_user -> Nullable<Varchar>,
+        receiver_room -> Nullable<Varchar>,
+        content -> Nullable<Varchar>,
+        timestamp -> Nullable<Timestamptz>,
+        read -> Nullable<Bool>,
+    }
+}
+
+table! {
+    room_connections (room_id, user_id) {
+        room_id -> Varchar,
+        user_id -> Varchar,
     }
 }
 
@@ -19,15 +35,6 @@ table! {
 }
 
 table! {
-    user_room_junction (id) {
-        id -> Int4,
-        user_id -> Varchar,
-        room_id -> Nullable<Varchar>,
-        user_is_admin -> Bool,
-    }
-}
-
-table! {
     users (id) {
         id -> Varchar,
         username -> Varchar,
@@ -35,14 +42,16 @@ table! {
     }
 }
 
-joinable!(messages -> rooms (rec_room));
+joinable!(hall_of_fame -> users (user_id));
+joinable!(messages -> rooms (receiver_room));
+joinable!(room_connections -> rooms (room_id));
+joinable!(room_connections -> users (user_id));
 joinable!(rooms -> users (admin));
-joinable!(user_room_junction -> rooms (room_id));
-joinable!(user_room_junction -> users (user_id));
 
 allow_tables_to_appear_in_same_query!(
+    hall_of_fame,
     messages,
+    room_connections,
     rooms,
-    user_room_junction,
     users,
 );

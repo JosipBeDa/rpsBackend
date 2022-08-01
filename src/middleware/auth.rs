@@ -1,5 +1,5 @@
 use crate::models::error::{AuthenticationError, GlobalError};
-use crate::models::user::ChatUser;
+use crate::actors::chat::models::chat_user::ChatUser;
 use crate::services::jwt;
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
 use colored::Colorize;

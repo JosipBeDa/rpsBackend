@@ -1,10 +1,9 @@
+use crate::actors::rps::models::RPSError;
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder as Response, ResponseError};
 use reqwest::StatusCode;
 use serde::Serialize;
 use std::fmt::Display;
 use thiserror::Error;
-
-use crate::rps::models::RPSError;
 
 /// The main wrapper for all the errors we can encounter
 #[derive(Debug, Error)]
@@ -26,7 +25,7 @@ pub enum GlobalError {
     #[error("`{0}`")]
     AuthenticationError(AuthenticationError),
     #[error("`{0}`")]
-    RPSError(RPSError)
+    RPSError(RPSError),
 }
 
 impl GlobalError {

@@ -14,15 +14,20 @@ pub fn setup_routes(cfg: &mut web::ServiceConfig) {
             .route(web::get().to(routes::users::handler))
             .wrap(crate::middleware::auth::LoggedGuard),
     );
-    // GET /chat -- Upgrades to websocket on success
+    // GET /hof
+    cfg.service(
+        web::resource("/hof")
+            .route(web::get().to(routes::hall_of_fame::handler))
+            .wrap(crate::middleware::auth::LoggedGuard),
+    );
+    // GET /chat -- Upgrades to websocket on success, extracts user info from the authorization JWT so no need for LoggedGuard  
     cfg.service(
         web::resource("/chat")
             .route(web::get().to(routes::chat::handler))
-            .wrap(crate::middleware::auth::LoggedGuard),
     );
 }
 
-/// Return cors configuration for the project
+/// Return cors configuration
 pub fn setup_cors() -> Cors {
     Cors::default()
         .allowed_origin("http://localhost:4200")

@@ -1,14 +1,19 @@
 //! The session actor.
-use super::ez_handler;
-use super::models::messages::{Connect, Disconnect, Message};
-use crate::rps::manager::RPSManager;
+use super::models::chat_user::ChatUser;
 use super::server::ChatServer;
-use crate::models::user::ChatUser;
+use crate::actors::{
+    ez_handler,
+    models::messages::{
+        client_message::SocketMessage,
+        connection::{Connect, Disconnect},
+    },
+    rps::manager::RPSManager,
+};
 use actix::prelude::*;
 use actix_web_actors::ws;
 use colored::Colorize;
 use std::time::{Duration, Instant};
-use tracing::{warn, info};
+use tracing::{info, warn};
 
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -31,7 +36,7 @@ pub struct WsChatSession {
     /// The heartbeat. A ping message gets sent every `HEARTBEAT_INTERVAL` seconds,
     /// if a pong isn't received for `CLIENT_TIMEOUT` seconds, drop the connection
     pub heartbeat: Instant,
-    /// The address of the chat server. Every session sends their messages to here for processing.
+    /// The address of the chat server.
     pub address: Addr<ChatServer>,
     /// The address of the RPS Manager
     pub rps_address: Addr<RPSManager>,
@@ -94,9 +99,9 @@ impl Actor for WsChatSession {
 /// The session actor implements a handler only for the message type, which is
 /// ultimately always going to be JSON. It simply sends a text frame
 /// of that JSON to the client.
-impl Handler<Message> for WsChatSession {
+impl Handler<SocketMessage> for WsChatSession {
     type Result = ();
-    fn handle(&mut self, msg: Message, context: &mut Self::Context) {
+    fn handle(&mut self, msg: SocketMessage, context: &mut Self::Context) {
         context.text(msg.0);
     }
 }

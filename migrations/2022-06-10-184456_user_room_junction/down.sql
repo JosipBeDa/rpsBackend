@@ -1,1 +1,0 @@
-DROP TABLE user_room_junction;

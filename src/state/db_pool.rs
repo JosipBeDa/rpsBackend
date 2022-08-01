@@ -2,15 +2,13 @@ use super::app::AppState;
 use crate::models::error::GlobalError;
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
-use dotenv::dotenv;
-use std::env;
-
+use crate::config::config::Config;
 pub type PgPool = Pool<ConnectionManager<PgConnection>>;
 
 // Create connection pool for global application use
 pub fn establish_pool_connection() -> PgPool {
-    dotenv().ok();
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let config = Config::from_env().expect("Couldn't build config");
+    let database_url = config.get_db_url();
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     // min_idle VERY IMPORTANT for sanity, if not set the server will use the start with YOLO method
     Pool::builder()

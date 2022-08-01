@@ -1,12 +1,13 @@
 CREATE TABLE messages (
-    id SERIAL,
+    id VARCHAR(36) UNIQUE NOT NULL,
     sender_id VARCHAR (36) NOT NULL,
-    rec_user VARCHAR (36),
-    rec_room VARCHAR(36),
-    body VARCHAR (500),
-    time_sent TIMESTAMPTZ,
+    receiver_user VARCHAR (36),
+    receiver_room VARCHAR (36),
+    content VARCHAR (2000),
+    "timestamp" TIMESTAMPTZ,
+    "read" BOOLEAN,
     PRIMARY KEY (id),
     FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (rec_user) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (rec_room) REFERENCES rooms(id) ON DELETE CASCADE
+    FOREIGN KEY (receiver_user) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (receiver_room) REFERENCES rooms(id) ON DELETE CASCADE
 );

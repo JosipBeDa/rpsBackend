@@ -1,7 +1,7 @@
 use super::game::RPS;
 use actix::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::fmt::Display;
+use std::{fmt::Display, collections::HashSet};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RPSError {
@@ -16,29 +16,35 @@ impl Display for RPSError {
 /// Represents the type of messages the rps manager accepts
 #[derive(MessageResponse, Debug, Serialize, Deserialize, Clone)]
 pub enum RPSData {
+    // Client
     Init(Init),
     Action(Action),
+    // Server
     State(RPS),
     Update(Update),
     Rooms(Vec<RPS>),
-    None,
+    None
 }
 impl actix::Message for RPSData {
     type Result = Self;
 }
 
+/// Sent to the client
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Update {
     pub game_id: String,
     pub event: Event,
 }
 
+/// Indicates the type of event that occurred as a consequence of a player's action
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Event {
     PlayerConnected(String),
     FastToggled(bool),
     Choices(Vec<(String, char)>),
-    Winners(Vec<String>),
+    Exclude(HashSet<String>),
+    Winner(String),
+    GG(String)
 }
 
 /// Message used to instantiate an rps game
@@ -46,6 +52,7 @@ pub enum Event {
 pub struct Init {
     pub host: String,
     pub players: Vec<String>,
+    pub gg_score: usize
 }
 
 /// Sent by the client
@@ -56,6 +63,7 @@ pub struct Action {
     pub action: RPSAction,
 }
 
+/// Data sent by the client indicating the specified action
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum RPSAction {
     /// Inserts the player into the rps connections
@@ -64,6 +72,4 @@ pub enum RPSAction {
     Choose(char),
     /// Toggles fast mode
     FastMode(bool),
-    Spectate,
-    Reset,
 }

@@ -34,3 +34,6 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+-- This extension will allow us to use UUID as the primary key for objects
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

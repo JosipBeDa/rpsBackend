@@ -1,0 +1,8 @@
+version: "3"
+services:
+  rps-chat-backend:
+    build: .src/bin/server
+    volumes:
+      - ./:/rpsbackend
+    environment:
+      - USER=biblius

@@ -4,8 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     error::GlobalError,
-    user::{ChatUser, User},
+    user::User,
 };
+use crate::actors::chat::models::chat_user::ChatUser;
 use crate::services::{cookie::create_cookie, jwt};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]

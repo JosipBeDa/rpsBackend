@@ -1,4 +1,4 @@
-use crate::chat::*;
+use crate::actors::chat::session::WsChatSession;
 use crate::models::error::{AuthenticationError, GlobalError};
 use crate::services::jwt;
 use crate::state::app::AppState;
@@ -16,7 +16,7 @@ pub async fn handler(
     if let Some(token) = req.cookie("Authorization") {
         let chat_user = jwt::verify(token.value())?;
         ws::WsResponseBuilder::new(
-            session::WsChatSession {
+            WsChatSession {
                 id: chat_user.id.clone(),
                 username: chat_user.username,
                 room: chat_user.id,

@@ -45,7 +45,7 @@ pub fn generate_rsa_key_pair() -> Result<(), WriteError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{services::jwt::Claims, models::user::ChatUser};
+    use crate::{services::jwt::Claims, actors::chat::models::chat_user::ChatUser};
     use jsonwebtoken::*;
 
     #[test]

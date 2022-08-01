@@ -6,7 +6,6 @@ use lib::application;
 use lib::config::config::Config;
 use lib::state;
 use tracing::info;
-
 use env_logger::Env;
 
 pub async fn hello_world() -> impl actix_web::Responder {

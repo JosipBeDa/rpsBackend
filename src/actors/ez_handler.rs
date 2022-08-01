@@ -1,10 +1,11 @@
 //! Every text message the `WsChatSession` stream handler receives is sent to this
 //! handler for processing.
-use super::models::messages::{ChatMessage, ClientMessage, Join, MessageData, Read};
-use super::session::WsChatSession;
-use crate::chat::models::messages::CreateRoom;
+use super::chat::models::messages::{ChatMessage, CreateRoom, Join, Read};
+
+use super::chat::session::WsChatSession;
+use crate::actors::models::messages::client_message::{MessageData, ClientMessage};
+use crate::actors::rps::{game::RPS, models::RPSData};
 use crate::models::error::GlobalError;
-use crate::rps::{game::RPS, models::RPSData};
 use actix::prelude::*;
 use actix_web_actors::ws::WebsocketContext;
 use colored::Colorize;
@@ -107,6 +108,7 @@ pub fn handle<T>(
 }
 
 /// Generate a `ClientMessage` with the given data.
+#[inline]
 pub fn generate_message<T>(header: &str, data: MessageData<T>) -> Result<String, GlobalError>
 where
     T: Serialize,
@@ -119,11 +121,13 @@ where
 }
 
 /// Parses text to `ClientMessage`
+#[inline]
 pub fn parse_message<T: DeserializeOwned + Serialize>(message: String) -> ClientMessage<T> {
     info!("GOT MESSAGE PARSING : {}", message);
     serde_json::from_str::<ClientMessage<T>>(&message.trim()).unwrap()
 }
 
+#[inline]
 pub fn get_header<'a>(s: String) -> String {
     let message: Value = serde_json::from_str(&s).unwrap();
     let header = &message["header"];
