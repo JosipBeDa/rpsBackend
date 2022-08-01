@@ -1,8 +1,8 @@
 use super::app::AppState;
+use crate::config::config::Config;
 use crate::models::error::GlobalError;
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
-use crate::config::config::Config;
 pub type PgPool = Pool<ConnectionManager<PgConnection>>;
 
 // Create connection pool for global application use

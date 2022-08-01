@@ -1,10 +1,12 @@
 #[macro_use]
 extern crate diesel;
 extern crate bcrypt;
+extern crate diesel_migrations;
 extern crate dotenv;
 extern crate jsonwebtoken;
 extern crate tracing;
 
+pub mod actors;
 pub mod application;
 pub mod config;
 pub mod crypto;
@@ -14,6 +16,5 @@ pub mod routes;
 pub mod schema;
 pub mod services;
 pub mod state;
-pub mod actors;
 
 pub const TOKEN_DURATION: cookie::time::Duration = cookie::time::Duration::hours(3);
