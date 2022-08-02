@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate diesel;
 extern crate bcrypt;
-extern crate diesel_migrations;
 extern crate dotenv;
 extern crate jsonwebtoken;
 extern crate tracing;
