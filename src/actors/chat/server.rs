@@ -75,7 +75,7 @@ impl ChatServer {
     }
 
     /// Send a message to all users in a specific room
-    fn room_broadcast(&self, room_id: &str, message: String) {
+    fn _room_broadcast(&self, room_id: &str, message: String) {
         if let Some(room) = self.public_rooms.get(room_id) {
             for user_id in room.get_user_ids() {
                 if let Some(address) = self.sessions.get(&user_id) {
